@@ -190,8 +190,19 @@ function createSalesPerDayChart(data) {
             parseDate(originalDate)
 
         // PADRONIZA yyyy-mm-dd
+        const day =
+            String(parsedDate.getDate())
+                .padStart(2, "0")
+
+        const month =
+            String(parsedDate.getMonth() + 1)
+                .padStart(2, "0")
+
+        const year =
+            parsedDate.getFullYear()
+
         const key =
-            parsedDate.toISOString().split("T")[0]
+            `${year}-${month}-${day}`
 
         grouped[key] =
             (grouped[key] || 0) + 1
@@ -387,6 +398,72 @@ function createInstallationChart(data) {
                     legend: {
                         labels: {
                             color: "#000"
+                        }
+                    }
+                }
+            }
+        }
+    )
+}
+
+function createPlansChart(data) {
+
+    destroyChart(plansChart)
+
+    const wonOnly = data.filter(item =>
+        STATUS.won.includes(
+            normalize(item[COLUMN_MAP.status])
+        )
+    )
+
+    const grouped = groupBy(
+        wonOnly,
+        COLUMN_MAP.plano
+    )
+
+    plansChart = new Chart(
+        document.getElementById("plansChart"),
+        {
+            type: "bar",
+
+            data: {
+                labels: Object.keys(grouped),
+
+                datasets: [{
+                    label: "Planos",
+                    data: Object.values(grouped)
+                }]
+            },
+
+            options: {
+                indexAxis: "y",
+                responsive: true,
+                maintainAspectRatio: false,
+
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: "#000"
+                        }
+                    }
+                },
+
+                scales: {
+                    x: {
+                        ticks: {
+                            color: "#000"
+                        },
+                        grid: {
+                            color: "rgba(255,255,255,0.05)"
+                        }
+                    },
+
+                    y: {
+                        ticks: {
+                            color: "#000"
+                        },
+                        grid: {
+                            color: "rgba(255,255,255,0.05)"
                         }
                     }
                 }

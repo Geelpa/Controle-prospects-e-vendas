@@ -5,6 +5,7 @@ const COLUMN_MAP = {
     canal: "Canal de venda",
     campanha: "Campanha",
     vendedor: "Vendedor",
+    plano: "Plano de venda",
     status: "Status",
     motivoPerda: "Descrição",
     data: "Data novo"
@@ -49,8 +50,10 @@ const MONTH_MAP = {
     12: "Dezembro"
 }
 
-let originalData = []
 
+
+let originalData = []
+let plansChart
 let channelsChart
 let campaignsChart
 let lossReasonsChart

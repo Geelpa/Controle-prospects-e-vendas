@@ -35,24 +35,53 @@ function groupBy(data, columnName) {
 
     data.forEach(item => {
 
-        let key = item[columnName] || "Não informado"
+        let key = item[columnName]
 
+        // PLANOS
+        if (columnName === COLUMN_MAP.plano) {
+
+            // SE VIER ID
+            if (PLAN_MAP[key]) {
+
+                key = PLAN_MAP[key].name
+
+            } else {
+
+                // SE JÁ VIER NOME
+                key = key || "Sem plano"
+            }
+        }
+
+        // CAMPANHAS
         if (columnName === COLUMN_MAP.campanha) {
-            key = CAMPAIGN_MAP[key] || `Campanha ${key}`
+
+            key =
+                CAMPAIGN_MAP[key] ||
+                `Campanha ${key}`
         }
 
+        // CANAIS
         if (columnName === COLUMN_MAP.canal) {
-            key = CHANNEL_MAP[key] || `Canal ${key}`
+
+            key =
+                CHANNEL_MAP[key] ||
+                `Canal ${key}`
         }
 
+        // VENDEDORES
         if (columnName === COLUMN_MAP.vendedor) {
-            key = SELLER_MAP[key] || `Vendedor ${key}`
+
+            key =
+                SELLER_MAP[key] ||
+                `Vendedor ${key}`
         }
 
-        grouped[key] = (grouped[key] || 0) + 1
+        grouped[key] =
+            (grouped[key] || 0) + 1
     })
 
     return Object.fromEntries(
+
         Object.entries(grouped)
             .sort((a, b) => b[1] - a[1])
     )

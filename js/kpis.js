@@ -4,8 +4,11 @@ function updateKPIs({
     lost,
     noViability,
     inProgress,
-    conversion
+    conversion,
+    averageTicket
 }) {
+    document.getElementById("averageTicket").innerText =
+        averageTicket
 
     document.getElementById("totalProspects").innerText =
         total

@@ -50,13 +50,68 @@ function processData(data) {
             ? ((won / validLeads) * 100).toFixed(1)
             : 0
 
+    const wonOnly = data.filter(item =>
+        STATUS.won.includes(
+            normalize(item[COLUMN_MAP.status])
+        )
+    )
+
+    let totalRevenue = 0
+
+    wonOnly.forEach(item => {
+
+        const planId =
+            item[COLUMN_MAP.plano]
+
+        let price = 0
+
+        // SE VIER ID
+        if (PLAN_MAP[planId]) {
+
+            price = PLAN_MAP[planId].price
+
+        } else {
+
+            // SE VIER NOME
+            const foundPlan =
+                Object.values(PLAN_MAP).find(plan =>
+                    normalize(plan.name) ===
+                    normalize(planId)
+                )
+
+            if (foundPlan) {
+                price = foundPlan.price
+            }
+        }
+
+        totalRevenue += price
+
+        // if (plan) {
+        //     totalRevenue += plan.price
+        // }
+    })
+
+    const averageTicket =
+        wonOnly.length > 0
+            ? totalRevenue / wonOnly.length
+            : 0
+
     updateKPIs({
         total,
         won,
         lost,
         noViability,
         inProgress,
-        conversion
+        conversion,
+
+        averageTicket:
+            averageTicket.toLocaleString(
+                "pt-BR",
+                {
+                    style: "currency",
+                    currency: "BRL"
+                }
+            )
     })
 
     createChannelsChart(data)
@@ -65,4 +120,5 @@ function processData(data) {
     createSalesPerDayChart(data)
     createSellersChart(data)
     createInstallationChart(data)
+    createPlansChart(data)
 }
