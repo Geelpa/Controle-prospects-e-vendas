@@ -130,11 +130,7 @@ function applyFilters() {
         document.getElementById("yearFilter").value
 
     const filteredData = rawData.filter(item => {
-        console.log({
-            coluna: COLUMN_MAP.data,
-            valor: item[COLUMN_MAP.data],
-            item
-        })
+
         // DATA
         const parsedDate =
             parseDate(item[COLUMN_MAP.data])
@@ -179,3 +175,15 @@ function applyFilters() {
 
     processData(filteredData)
 }
+
+document
+    .getElementById("sellerFilter")
+    .addEventListener("change", applyFilters)
+
+document
+    .getElementById("monthFilter")
+    .addEventListener("change", applyFilters)
+
+document
+    .getElementById("yearFilter")
+    .addEventListener("change", applyFilters)

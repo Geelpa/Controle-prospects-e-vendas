@@ -1,5 +1,4 @@
 function processData(data) {
-    console.log("PROCESS DATA:", data)
     const total = data.length
 
     const won = data.filter(item =>

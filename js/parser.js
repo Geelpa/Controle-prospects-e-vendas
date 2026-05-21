@@ -15,9 +15,6 @@ function handleFile(event) {
         skipEmptyLines: true,
 
         complete: function (results) {
-
-            console.log("CSV BRUTO:", results.data)
-
             rawData = results.data.filter(item => {
 
                 return Object.values(item)
@@ -25,11 +22,6 @@ function handleFile(event) {
                         String(value || "").trim() !== ""
                     )
             })
-
-            console.log(
-                "COLUNAS:",
-                Object.keys(rawData[0])
-            )
 
             populateFilters(rawData)
 
