@@ -12,21 +12,39 @@ function destroyChart(chart) {
 
 function parseDate(dateString) {
 
-    if (!dateString)
-        return new Date()
+    if (!dateString) return null
 
-    if (dateString.includes("/")) {
+    // REMOVE ESPAÇOS
+    dateString = String(dateString).trim()
 
-        const parts = dateString.split("/")
+    // FORMATO:
+    // dd/mm/yyyy
+    // dd/mm/yyyy hh:mm:ss
 
-        return new Date(
-            parts[2],
-            parts[1] - 1,
-            parts[0]
-        )
+    const [datePart] =
+        dateString.split(" ")
+
+    const parts =
+        datePart.split("/")
+
+    if (parts.length !== 3) {
+        return null
     }
 
-    return new Date(dateString)
+    const day =
+        parseInt(parts[0], 10)
+
+    const month =
+        parseInt(parts[1], 10) - 1
+
+    const year =
+        parseInt(parts[2], 10)
+
+    return new Date(
+        year,
+        month,
+        day
+    )
 }
 
 function groupBy(data, columnName) {

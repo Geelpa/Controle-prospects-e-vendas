@@ -27,6 +27,4 @@ const CHANNEL_MAP = {
     "45": "Panfleto Sinaleira",
     "46": "Facebook",
     "47": "Instagram",
-
-
 }

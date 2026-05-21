@@ -1,21 +1,5 @@
-document
-    .getElementById("csvFile")
-    .addEventListener("change", handleFileUpload)
-
-document
-    .getElementById("sellerFilter")
-    .addEventListener("change", applyFilters)
-
-document
-    .getElementById("monthFilter")
-    .addEventListener("change", applyFilters)
-
-document
-    .getElementById("yearFilter")
-    .addEventListener("change", applyFilters)
-
 function processData(data) {
-
+    console.log("PROCESS DATA:", data)
     const total = data.length
 
     const won = data.filter(item =>

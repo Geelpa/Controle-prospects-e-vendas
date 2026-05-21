@@ -1,6 +1,6 @@
 let sellersChart
 let installationChart
-
+let rawData = []
 const COLUMN_MAP = {
     canal: "Canal de venda",
     campanha: "Campanha",
@@ -8,7 +8,7 @@ const COLUMN_MAP = {
     plano: "Plano de venda",
     status: "Status",
     motivoPerda: "Descrição",
-    data: "Data novo"
+    data: "Data do cadastro"
 }
 
 const STATUS = {

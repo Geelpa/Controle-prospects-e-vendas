@@ -34,75 +34,91 @@ function populateSellerFilter(data) {
 
 function populateMonthFilter(data) {
 
-    const select =
+    const monthFilter =
         document.getElementById("monthFilter")
 
-    select.innerHTML =
-        '<option value="all">Todos</option>'
+    monthFilter.innerHTML =
+        `<option value="all">Todos</option>`
 
     const months = [
+
         ...new Set(
-            data.map(item => {
 
-                const date = parseDate(
-                    item[COLUMN_MAP.data]
-                )
+            data
+                .map(item => {
 
-                return date.getMonth() + 1
-            })
+                    const parsedDate =
+                        parseDate(item[COLUMN_MAP.data])
+
+                    // IGNORA DATAS INVÁLIDAS
+                    if (!parsedDate) return null
+
+                    return parsedDate.getMonth() + 1
+                })
+
+                .filter(Boolean)
         )
-    ]
 
-    months
-        .sort((a, b) => a - b)
-        .forEach(month => {
+    ].sort((a, b) => a - b)
 
-            const option = document.createElement("option")
+    months.forEach(month => {
 
-            option.value = month
+        const option =
+            document.createElement("option")
 
-            option.textContent = MONTH_MAP[month]
+        option.value = month
 
-            select.appendChild(option)
-        })
+        option.textContent =
+            MONTH_MAP[month]
+
+        monthFilter.appendChild(option)
+    })
 }
 
 function populateYearFilter(data) {
 
-    const select =
+    const yearFilter =
         document.getElementById("yearFilter")
 
-    select.innerHTML =
-        '<option value="all">Todos</option>'
+    yearFilter.innerHTML =
+        `<option value="all">Todos</option>`
 
     const years = [
+
         ...new Set(
-            data.map(item => {
 
-                const date = parseDate(
-                    item[COLUMN_MAP.data]
-                )
+            data
+                .map(item => {
 
-                return date.getFullYear()
-            })
+                    const parsedDate =
+                        parseDate(item[COLUMN_MAP.data])
+
+                    // IGNORA DATAS INVÁLIDAS
+                    if (!parsedDate) return null
+
+                    return parsedDate.getFullYear()
+                })
+
+                .filter(Boolean)
         )
-    ]
 
-    years
-        .sort((a, b) => a - b)
-        .forEach(year => {
+    ].sort((a, b) => b - a)
 
-            const option = document.createElement("option")
+    years.forEach(year => {
 
-            option.value = year
+        const option =
+            document.createElement("option")
 
-            option.textContent = year
+        option.value = year
+        option.textContent = year
 
-            select.appendChild(option)
-        })
+        yearFilter.appendChild(option)
+    })
 }
 
 function applyFilters() {
+
+
 
     const seller =
         document.getElementById("sellerFilter").value
@@ -113,23 +129,46 @@ function applyFilters() {
     const year =
         document.getElementById("yearFilter").value
 
-    const filtered = originalData.filter(item => {
+    const filteredData = rawData.filter(item => {
+        console.log({
+            coluna: COLUMN_MAP.data,
+            valor: item[COLUMN_MAP.data],
+            item
+        })
+        // DATA
+        const parsedDate =
+            parseDate(item[COLUMN_MAP.data])
 
-        const date = parseDate(
-            item[COLUMN_MAP.data]
-        )
+        // IGNORA DATAS INVÁLIDAS
+        if (!parsedDate) return false
 
+        const itemMonth =
+            parsedDate.getMonth() + 1
+
+        const itemYear =
+            parsedDate.getFullYear()
+
+        // VENDEDOR
         const sellerMatch =
+
             seller === "all" ||
-            item[COLUMN_MAP.vendedor] === seller
 
+            String(item[COLUMN_MAP.vendedor]) ===
+            String(seller)
+
+        // MÊS
         const monthMatch =
-            month === "all" ||
-            (date.getMonth() + 1).toString() === month
 
+            month === "all" ||
+
+            itemMonth === Number(month)
+
+        // ANO
         const yearMatch =
+
             year === "all" ||
-            date.getFullYear().toString() === year
+
+            itemYear === Number(year)
 
         return (
             sellerMatch &&
@@ -138,5 +177,5 @@ function applyFilters() {
         )
     })
 
-    processData(filtered)
+    processData(filteredData)
 }
