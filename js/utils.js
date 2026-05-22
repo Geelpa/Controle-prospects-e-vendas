@@ -104,3 +104,42 @@ function groupBy(data, columnName) {
             .sort((a, b) => b[1] - a[1])
     )
 }
+
+function extractBestDate(row) {
+
+    // PROCURA COLUNAS QUE CONTENHAM "data"
+    const possibleDateColumns = Object.keys(row)
+        .filter(key =>
+
+            normalize(key)
+                .includes("data")
+        )
+
+    if (!possibleDateColumns.length) {
+        return null
+    }
+
+    const validDates = []
+
+    possibleDateColumns.forEach(column => {
+
+        const value = row[column]
+
+        const parsed =
+            parseDate(value)
+
+        if (parsed) {
+
+            validDates.push(parsed)
+        }
+    })
+
+    if (!validDates.length) {
+        return null
+    }
+
+    // PEGA A MAIS RECENTE
+    validDates.sort((a, b) => b - a)
+
+    return validDates[0]
+}

@@ -48,7 +48,7 @@ function populateMonthFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        parseDate(item[COLUMN_MAP.data])
+                        extractBestDate(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -91,7 +91,7 @@ function populateYearFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        parseDate(item[COLUMN_MAP.data])
+                        extractBestDate(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -133,7 +133,7 @@ function applyFilters() {
 
         // DATA
         const parsedDate =
-            parseDate(item[COLUMN_MAP.data])
+            extractBestDate(item)
 
         // IGNORA DATAS INVÁLIDAS
         if (!parsedDate) return false

@@ -183,13 +183,11 @@ function createSalesPerDayChart(data) {
 
     wonOnly.forEach(item => {
 
-        const originalDate =
-            item[COLUMN_MAP.data]
-
         const parsedDate =
-            parseDate(originalDate)
+            extractBestDate(item)
 
-        // PADRONIZA yyyy-mm-dd
+        if (!parsedDate) return
+
         const day =
             String(parsedDate.getDate())
                 .padStart(2, "0")
@@ -215,13 +213,14 @@ function createSalesPerDayChart(data) {
                 new Date(a[0]) - new Date(b[0])
             )
 
-    // FORMATA PARA BR
-    const labels = sortedEntries.map(([date]) => {
+    const labels =
+        sortedEntries.map(([date]) => {
 
-        const d = new Date(date)
+            const [year, month, day] =
+                date.split("-")
 
-        return d.toLocaleDateString("pt-BR")
-    })
+            return `${day}/${month}/${year}`
+        })
 
     const values =
         sortedEntries.map(([_, value]) => value)
@@ -248,7 +247,7 @@ function createSalesPerDayChart(data) {
                 plugins: {
                     legend: {
                         labels: {
-                            color: "#000"
+                            color: "#CBD5E1"
                         }
                     }
                 },
@@ -256,7 +255,7 @@ function createSalesPerDayChart(data) {
                 scales: {
                     x: {
                         ticks: {
-                            color: "#000"
+                            color: "#CBD5E1"
                         },
                         grid: {
                             color: "rgba(255,255,255,0.05)"
@@ -265,7 +264,7 @@ function createSalesPerDayChart(data) {
 
                     y: {
                         ticks: {
-                            color: "#000"
+                            color: "#CBD5E1"
                         },
                         grid: {
                             color: "rgba(255,255,255,0.05)"
