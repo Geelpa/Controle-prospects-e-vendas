@@ -1,4 +1,5 @@
 const CHANNEL_MAP = {
+    "0": "Sem registro",
     "1": "Venda externa/folder",
     "2": "Google",
     "7": "Feiras/Eventos Externos",
