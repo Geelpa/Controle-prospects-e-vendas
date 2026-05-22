@@ -1,4 +1,8 @@
 const PLAN_MAP = {
+    "109": {
+        name: "Exclusivo Residencial Irlanda - 200Mb PME - ",
+        price: 90
+    },
     "108": {
         name: "Exclusivo Pekerson - 200Mb PME - ",
         price: 122.11

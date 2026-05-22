@@ -23,5 +23,6 @@ const CAMPAIGN_MAP = {
     "5": "Negociação",
     "4": "Aniversário 2024",
     "3": "Melhor Plano Net",
-    "2": "Campanha Cash Back"
+    "2": "Campanha Cash Back",
+    "0": "Não preenchido"
 }
