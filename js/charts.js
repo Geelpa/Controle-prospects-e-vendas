@@ -247,7 +247,7 @@ function createSalesPerDayChart(data) {
                 plugins: {
                     legend: {
                         labels: {
-                            color: "#CBD5E1"
+                            color: "#000"
                         }
                     }
                 },
@@ -255,7 +255,7 @@ function createSalesPerDayChart(data) {
                 scales: {
                     x: {
                         ticks: {
-                            color: "#CBD5E1"
+                            color: "#000"
                         },
                         grid: {
                             color: "rgba(255,255,255,0.05)"
@@ -264,7 +264,7 @@ function createSalesPerDayChart(data) {
 
                     y: {
                         ticks: {
-                            color: "#CBD5E1"
+                            color: "#000"
                         },
                         grid: {
                             color: "rgba(255,255,255,0.05)"
