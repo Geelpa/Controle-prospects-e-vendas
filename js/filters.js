@@ -128,6 +128,13 @@ function applyFilters() {
 
     const year =
         document.getElementById("yearFilter").value
+    const salesViewFilter =
+        document.getElementById("salesViewFilter")
+
+    if (salesViewFilter) {
+        salesViewFilter.dataset.autoMode =
+            month === "all" ? "month" : "week"
+    }
 
     const filteredData = rawData.filter(item => {
 
@@ -173,7 +180,125 @@ function applyFilters() {
         )
     })
 
+    updateSalesChartFilters(filteredData, month)
+
     processData(filteredData)
+}
+
+function updateSalesChartFilters(data, selectedMonth) {
+    const salesViewFilter =
+        document.getElementById("salesViewFilter")
+
+    const weekFilter =
+        document.getElementById("weekFilter")
+
+    const salesChartTitle =
+        document.getElementById("salesChartTitle")
+
+    if (!salesViewFilter || !weekFilter) return
+
+    if (selectedMonth === "all") {
+        salesViewFilter.value = "month"
+        salesViewFilter.disabled = true
+        weekFilter.classList.add("hidden")
+        weekFilter.value = "all"
+
+        if (salesChartTitle) {
+            salesChartTitle.textContent = "Vendas por Mês"
+        }
+
+        return
+    }
+
+    if (salesViewFilter.dataset.autoMode === "week") {
+        salesViewFilter.value = "week"
+    }
+
+    salesViewFilter.disabled = false
+
+    if (salesViewFilter.value === "month") {
+        weekFilter.classList.add("hidden")
+        weekFilter.value = "all"
+
+        if (salesChartTitle) {
+            salesChartTitle.textContent = "Vendas por Mês"
+        }
+
+        return
+    }
+
+    populateWeekFilter(data)
+    weekFilter.classList.remove("hidden")
+
+    if (salesChartTitle) {
+        salesChartTitle.textContent =
+            weekFilter.value === "all"
+                ? "Vendas por Semana"
+                : "Vendas por Dia"
+    }
+}
+
+function populateWeekFilter(data) {
+    const weekFilter =
+        document.getElementById("weekFilter")
+
+    const currentValue =
+        weekFilter.value
+
+    weekFilter.innerHTML =
+        '<option value="all">Todas as semanas</option>'
+
+    const weekStarts = [
+        ...new Set(
+            data
+                .filter(item =>
+                    STATUS.won.includes(
+                        normalize(item[COLUMN_MAP.status])
+                    )
+                )
+                .map(item => {
+                    const parsedDate =
+                        extractBestDate(item)
+
+                    if (!parsedDate) return null
+
+                    return formatDateKey(getWeekStart(parsedDate))
+                })
+                .filter(Boolean)
+        )
+    ].sort((a, b) => parseDateKey(a) - parseDateKey(b))
+
+    weekStarts.forEach(weekStart => {
+        const startDate = parseDateKey(weekStart)
+        const endDate = parseDateKey(weekStart)
+
+        endDate.setDate(endDate.getDate() + 6)
+
+        const option =
+            document.createElement("option")
+
+        option.value = weekStart
+        option.textContent =
+            `${formatShortDate(startDate)} a ${formatShortDate(endDate)}`
+
+        weekFilter.appendChild(option)
+    })
+
+    if ([...weekFilter.options].some(option => option.value === currentValue)) {
+        weekFilter.value = currentValue
+    }
+}
+
+function formatShortDate(date) {
+    const day =
+        String(date.getDate())
+            .padStart(2, "0")
+
+    const month =
+        String(date.getMonth() + 1)
+            .padStart(2, "0")
+
+    return `${day}/${month}`
 }
 
 document
@@ -186,4 +311,12 @@ document
 
 document
     .getElementById("yearFilter")
+    .addEventListener("change", applyFilters)
+
+document
+    .getElementById("salesViewFilter")
+    .addEventListener("change", applyFilters)
+
+document
+    .getElementById("weekFilter")
     .addEventListener("change", applyFilters)

@@ -8,6 +8,11 @@
 
     <title>Dashboard de Vendas</title>
 
+    <!-- Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
     <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -18,7 +23,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
-<body class="bg-orange-500 min-h-screen p-2">
+<body class="bg-orange-500 min-h-screen p-2 text-slate-900 font-['Inter',system-ui,sans-serif] antialiased">
 
     <div class="max-w-[1600px] mx-auto p-4">
 
@@ -26,13 +31,13 @@
         <div class="flex items-center justify-between mb-4">
 
             <div>
-                <h1 class="text-2xl font-bold">
+                <h1 class="text-2xl font-semibold text-white">
                     Dashboard Comercial
                 </h1>
             </div>
 
             <!-- Upload -->
-            <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+            <div class="bg-white border border-slate-200 rounded-lg px-4 py-3 shadow-sm">
 
                 <input type="file" id="csvFile" accept=".csv" class="text-sm" />
 
@@ -40,40 +45,91 @@
 
         </div>
 
+        <!-- INSTRUÇÕES -->
+        <div id="emptyState" class="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+            <div class="max-w-3xl">
+                <p class="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-2">
+                    Comece anexando sua base
+                </p>
+
+                <h2 class="text-2xl font-semibold text-slate-950 mb-3">
+                    Analise vendas, canais, campanhas e desempenho comercial
+                </h2>
+
+                <p class="text-sm text-slate-600 mb-5">
+                    Anexe um arquivo CSV para gerar automaticamente os KPIs e gráficos do dashboard.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-1">
+                            1. Anexe o CSV
+                        </p>
+                        <p class="text-sm text-slate-500">
+                            Use o seletor no topo para carregar a base de prospects e vendas.
+                        </p>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-1">
+                            2. Aplique filtros
+                        </p>
+                        <p class="text-sm text-slate-500">
+                            Filtre por vendedor, mês e ano para recortar a análise.
+                        </p>
+                    </div>
+
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-slate-800 mb-1">
+                            3. Leia os gráficos
+                        </p>
+                        <p class="text-sm text-slate-500">
+                            Compare planos, canais, campanhas e vendas por período.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboardContent" class="hidden">
+
         <!-- FILTROS -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
 
-            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
 
-                <label class="text-xs  block mb-1">
+                <label class="text-xs font-medium text-slate-500 block mb-1">
                     Vendedor
                 </label>
 
-                <select id="sellerFilter" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+                <select id="sellerFilter"
+                    class="w-full border border-slate-200 rounded-lg p-2 text-sm font-medium text-slate-700">
                     <option value="all">Todos</option>
                 </select>
 
             </div>
 
-            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
 
-                <label class="text-xs text-slate-500 block mb-1">
+                <label class="text-xs font-medium text-slate-500 block mb-1">
                     Mês
                 </label>
 
-                <select id="monthFilter" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+                <select id="monthFilter"
+                    class="w-full border border-slate-200 rounded-lg p-2 text-sm font-medium text-slate-700">
                     <option value="all">Todos</option>
                 </select>
 
             </div>
 
-            <div class="bg-white border border-slate-200 rounded-xl p-3 shadow-sm">
+            <div class="bg-white border border-slate-200 rounded-lg p-3 shadow-sm">
 
-                <label class="text-xs text-slate-500 block mb-1">
+                <label class="text-xs font-medium text-slate-500 block mb-1">
                     Ano
                 </label>
 
-                <select id="yearFilter" class="w-full border border-slate-200 rounded-lg p-2 text-sm">
+                <select id="yearFilter"
+                    class="w-full border border-slate-200 rounded-lg p-2 text-sm font-medium text-slate-700">
                     <option value="all">Todos</option>
                 </select>
 
@@ -84,61 +140,61 @@
         <!-- KPIs -->
         <div class="grid grid-cols-2 xl:grid-cols-7 gap-3 mb-4">
 
-            <div class="bg-white border border-slate-500 rounded-xl p-4 shadow-sm">
+            <div data-drilldown="prospects" role="button" tabindex="0" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                <p class="text-xs text-slate-500 uppercase tracking-wide">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Prospects
                 </p>
 
-                <h2 id="totalProspects" class="text-3xl font-bold mt-2">
+                <h2 id="totalProspects" class="text-3xl font-semibold mt-2">
                     0
                 </h2>
 
             </div>
 
-            <div class="bg-white border border-blue-800 rounded-xl p-4">
+            <div data-drilldown="inProgress" role="button" tabindex="0" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                <p class="text-xs text-slate-400 uppercase tracking-wider">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Em Andamento
                 </p>
 
-                <h2 id="inProgressDeals" class="text-3xl font-bold mt-2 text-violet-400">
+                <h2 id="inProgressDeals" class="text-3xl font-semibold mt-2 text-violet-600">
                     0
                 </h2>
 
             </div>
 
-            <div class="bg-white border border-green-500 rounded-xl p-4 shadow-sm">
+            <div data-drilldown="won" role="button" tabindex="0" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                <p class="text-xs text-slate-500 uppercase tracking-wide">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Vencemos
                 </p>
 
-                <h2 id="wonDeals" class="text-3xl font-bold mt-2 text-emerald-600">
+                <h2 id="wonDeals" class="text-3xl font-semibold mt-2 text-emerald-600">
                     0
                 </h2>
 
             </div>
 
-            <div class="bg-white border border-red-500 rounded-xl p-4 shadow-sm">
+            <div data-drilldown="lost" role="button" tabindex="0" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                <p class="text-xs text-slate-500 uppercase tracking-wide">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Perdemos
                 </p>
 
-                <h2 id="lostDeals" class="text-3xl font-bold mt-2 text-rose-600">
+                <h2 id="lostDeals" class="text-3xl font-semibold mt-2 text-rose-600">
                     0
                 </h2>
 
             </div>
 
-            <div class="bg-white border border-gray-500 rounded-xl p-4">
+            <div data-drilldown="noViability" role="button" tabindex="0" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                <p class="text-xs text-slate-400 uppercase tracking-wider">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Sem Viabilidade
                 </p>
 
-                <h2 id="noViabilityDeals" class="text-3xl font-bold mt-2 text-amber-400">
+                <h2 id="noViabilityDeals" class="text-3xl font-semibold mt-2 text-amber-600">
                     0
                 </h2>
 
@@ -146,24 +202,24 @@
 
 
 
-            <div class="bg-white border border-sky-400 rounded-xl p-4 shadow-sm">
+            <div class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <p class="text-xs text-slate-500 uppercase tracking-wide">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Conversão
                 </p>
 
-                <h2 id="conversionRate" class="text-3xl font-bold mt-2 text-sky-600">
+                <h2 id="conversionRate" class="text-3xl font-semibold mt-2 text-sky-600">
                     0%
                 </h2>
 
             </div>
-            <div class="bg-white border border-cyan-800 rounded-xl p-4">
+            <div class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <p class="text-xs text-slate-400 uppercase tracking-wider">
+                <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                     Ticket Médio
                 </p>
 
-                <h2 id="averageTicket" class="text-3xl font-bold mt-2 text-cyan-400">
+                <h2 id="averageTicket" class="text-3xl font-semibold mt-2 text-cyan-600">
                     R$ 0,00
                 </h2>
 
@@ -174,8 +230,8 @@
         <!-- GRÁFICOS -->
         <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <!-- PLANOS -->
-            <div class="bg-white border rounded-xl p-4">
-                <h3 class="text-sm font-semibold mb-3">
+            <div id="plansChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Planos Mais Vendidos
                 </h3>
 
@@ -185,8 +241,8 @@
             </div>
 
             <!-- VENDEDORES -->
-            <div class="bg-white border  rounded-xl p-4">
-                <h3 class="text-sm font-semibold mb-3">
+            <div id="sellersChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Ranking de Vendedores
                 </h3>
 
@@ -196,9 +252,9 @@
             </div>
 
             <!-- CANAIS -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div id="channelsChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <h3 class="text-sm font-semibold mb-3">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Canais de Venda
                 </h3>
 
@@ -209,9 +265,9 @@
             </div>
 
             <!-- CAMPANHAS -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div id="campaignsChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <h3 class="text-sm font-semibold mb-3">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Campanhas
                 </h3>
 
@@ -222,9 +278,9 @@
             </div>
 
             <!-- MOTIVOS -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div id="lossReasonsChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <h3 class="text-sm font-semibold mb-3">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Motivos de Perda
                 </h3>
 
@@ -235,11 +291,26 @@
             </div>
 
             <!-- VENDAS -->
-            <div class="bg-white border border-slate-200 rounded-xl p-4 shadow-sm">
+            <div id="salesPerDayChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <h3 class="text-sm font-semibold mb-3">
-                    Vendas por Dia
-                </h3>
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-3">
+                    <h3 id="salesChartTitle" class="text-sm font-semibold text-slate-800">
+                        Vendas por Período
+                    </h3>
+
+                    <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <select id="salesViewFilter"
+                            class="border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                            <option value="month">Por mês</option>
+                            <option value="week">Por semana</option>
+                        </select>
+
+                        <select id="weekFilter"
+                            class="hidden border border-slate-200 rounded-lg px-3 py-2 text-sm font-medium text-slate-700">
+                            <option value="all">Todas as semanas</option>
+                        </select>
+                    </div>
+                </div>
 
                 <div class="h-[320px]">
                     <canvas id="salesPerDayChart"></canvas>
@@ -248,9 +319,9 @@
             </div>
 
             <!-- TAXAS -->
-            <div class="bg-white border rounded-xl p-4">
+            <div id="installationChartCard" class="bg-white border border-slate-200 rounded-lg p-4 shadow-sm">
 
-                <h3 class="text-sm font-semibold mb-3">
+                <h3 class="text-sm font-semibold mb-3 text-slate-800">
                     Instalações Pagas vs Isentas
                 </h3>
 
@@ -262,6 +333,40 @@
 
         </div>
 
+        </div>
+
+    </div>
+
+    <div id="prospectModal" class="hidden fixed inset-0 z-50 bg-slate-950/50 p-4">
+        <div class="bg-white border border-slate-200 rounded-lg shadow-xl max-w-6xl mx-auto mt-8 max-h-[85vh] flex flex-col">
+            <div class="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+                <div>
+                    <h2 id="prospectModalTitle" class="text-lg font-semibold text-slate-950">
+                        Prospects
+                    </h2>
+                    <p id="prospectModalCount" class="text-sm text-slate-500">
+                        0 registros
+                    </p>
+                </div>
+
+                <button id="closeProspectModal" type="button" class="border border-slate-200 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                    Fechar
+                </button>
+            </div>
+
+            <div id="prospectModalEmpty" class="hidden p-6 text-sm text-slate-500">
+                Nenhum registro encontrado para este filtro.
+            </div>
+
+            <div class="overflow-auto">
+                <table class="min-w-full text-sm">
+                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 sticky top-0">
+                        <tr id="prospectListHeader"></tr>
+                    </thead>
+                    <tbody id="prospectListBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
     <script src="js/config.js"></script>
@@ -273,6 +378,7 @@
     <script src="js/parser.js"></script>
     <script src="js/kpis.js"></script>
     <script src="js/charts.js"></script>
+    <script src="js/drilldown.js"></script>
     <script src="js/filters.js"></script>
     <script src="js/app.js"></script>
 </body>

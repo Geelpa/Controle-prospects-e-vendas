@@ -1,14 +1,14 @@
 const PLAN_MAP = {
     "109": {
-        name: "Exclusivo Residencial Irlanda - 200Mb PME - ",
+        name: "Residencial Irlanda - 200Mb PME",
         price: 90
     },
     "108": {
-        name: "Exclusivo Pekerson - 200Mb PME - ",
+        name: "Exclusivo Pekerson - 200Mb PME",
         price: 122.11
     },
     "107": {
-        name: "Funcionários Essential - 300Mb",
+        name: "Funcionários - 300Mb",
         price: 0
     },
     "106": {
@@ -52,11 +52,11 @@ const PLAN_MAP = {
         price: 111
     },
     "95": {
-        name: "Plano Adicionai - 400Mb em DOBRO PF + Watch + HBO",
+        name: "Plano Adicional - 400Mb em DOBRO",
         price: 111
     },
     "94": {
-        name: "Plano Adicional - 300Mb em DOBRO PF + Watch",
+        name: "Plano Adicional - 300Mb em DOBRO",
         price: 111
     },
     "93": {
@@ -64,7 +64,7 @@ const PLAN_MAP = {
         price: 222.11
     },
     "92": {
-        name: "Plano Adicional 200Mb em DOBRO VPU - PF",
+        name: "Plano Adicional 200Mb em DOBRO",
         price: 111
     },
     "91": {
@@ -80,47 +80,47 @@ const PLAN_MAP = {
         price: 111
     },
     "88": {
-        name: "200Mb em DOBRO VPU - PF ",
+        name: "200Mb em DOBRO VPU - PF",
         price: 122.11
     },
     "87": {
-        name: "300Mb em DOBRO PF  + Watch",
+        name: "300Mb em DOBRO",
         price: 144.33
     },
     "86": {
-        name: "400Mb em DOBRO PF  + Watch + HBO",
+        name: "400Mb em DOBRO",
         price: 166.55
     },
     "85": {
-        name: "100 Mb Link Dedicado com IP Fixo - ",
+        name: "100 Mb Link Dedicado",
         price: 555.44
     },
     "84": {
-        name: "1Gb + Telefonia + 1 IP fixo PME ",
+        name: "1Gb  PME",
         price: 277.66
     },
     "83": {
-        name: "400Mb + Telefonia + 1 IP fixo PME ",
+        name: "400Mb PME",
         price: 166.55
     },
     "82": {
-        name: "200Mb PME - ",
+        name: "200Mb PME",
         price: 144.33
     },
     "81": {
-        name: "1Gb VPU - Pessoa Jurídica",
+        name: "1Gb VPU - PJ",
         price: 222.11
     },
     "80": {
-        name: "300Mb em DOBRO PJ +Watch+Paramount",
+        name: "300Mb em DOBRO PJ",
         price: 144.33
     },
     "79": {
-        name: "400Mb em DOBRO PJ + Watch + Paramount + HBO",
+        name: "400Mb em DOBRO",
         price: 166.55
     },
     "78": {
-        name: "100Mb VPU Pessoa Jurídica",
+        name: "100Mb VPU PJ",
         price: 111
     },
     "77": {
@@ -128,7 +128,7 @@ const PLAN_MAP = {
         price: 122.11
     },
     "76": {
-        name: "50 Mb LINK DEDICADO COM IP FIXO",
+        name: "50 Mb LINK DEDICADO",
         price: 555.44
     },
     "75": {
@@ -136,15 +136,15 @@ const PLAN_MAP = {
         price: 222.11
     },
     "72": {
-        name: "300Mb em DOBRO PF + Watch",
+        name: "300Mb em DOBRO PF",
         price: 144.33
     },
     "71": {
-        name: "400Mb em DOBRO PF + Watch + HBO",
+        name: "400Mb em DOBRO PF",
         price: 166.55
     },
     "70": {
-        name: "300Mb + 300Mb Residencial VPU",
+        name: "300Mb + 300Mb",
         price: 144.33
     },
     "69": {
@@ -180,51 +180,51 @@ const PLAN_MAP = {
         price: 2998.8
     },
     "59": {
-        name: "400Mb + Telefonia + 1 IP fixo PME - ",
+        name: "400Mb PME",
         price: 166.55
     },
     "58": {
-        name: "200Mb PME - ",
+        name: "200Mb PME",
         price: 144.32
     },
     "57": {
-        name: "100Mb VPU PF ",
+        name: "100Mb VPU PF",
         price: 111
     },
     "54": {
-        name: "200Mb em DOBRO VPU - PF ",
+        name: "200Mb em DOBRO VPU",
         price: 122.11
     },
     "53": {
-        name: "300Mb em DOBRO PF  + Watch + Paramount",
+        name: "300Mb em DOBRO PF",
         price: 144.32
     },
     "52": {
-        name: "400Mb em DOBRO PF  + Watch + Paramount + HBO",
+        name: "400Mb em DOBRO PF",
         price: 166.55
     },
     "51": {
-        name: "1Gb VPU - Pessoa Jurídica",
+        name: "1Gb VPU - PJ",
         price: 222.11
     },
     "50": {
-        name: "400Mb VPU - Pessoa Jurídica",
+        name: "400Mb VPU - PJ",
         price: 166.55
     },
     "49": {
-        name: "200Mb VPU Pessoa Jurídica",
+        name: "200Mb VPU PJ",
         price: 122.11
     },
     "48": {
-        name: "300Mb em DOBRO PJ +Watch+Paramount",
+        name: "300Mb em DOBRO PJ",
         price: 144.32
     },
     "47": {
-        name: "400Mb em DOBRO PJ + Watch + Paramount + HBO",
+        name: "400Mb em DOBRO PJ",
         price: 166.55
     },
     "46": {
-        name: "100Mb VPU Pessoa Jurídica",
+        name: "100Mb VPU PJ",
         price: 111
     },
     "45": {
@@ -235,24 +235,20 @@ const PLAN_MAP = {
         name: "TESTE-HUB",
         price: 0
     },
-    "43": {
-        name: "100Mb VPU - Serviço de Conexão de Internet",
-        price: 0
-    },
     "42": {
         name: "1Gb VPU",
         price: 222.11
     },
     "41": {
-        name: "300Mb em dobro + Watch + Paramount",
+        name: "300Mb em dobro",
         price: 0
     },
     "40": {
-        name: "300Mb em DOBRO PF + Watch + Paramount",
+        name: "300Mb em DOBRO PF",
         price: 144.32
     },
     "39": {
-        name: "400Mb em DOBRO PF + Watch + Paramount + HBO",
+        name: "400Mb em DOBRO PF",
         price: 166.55
     },
     "38": {
@@ -260,11 +256,11 @@ const PLAN_MAP = {
         price: 0
     },
     "37": {
-        name: "300Mb + 300Mb Residencial VPU",
+        name: "300Mb + 300Mb",
         price: 144.32
     },
     "36": {
-        name: "200Mb em DOBRO VPU - PF",
+        name: "200Mb em DOBRO",
         price: 122.11
     },
     "35": {
@@ -275,10 +271,7 @@ const PLAN_MAP = {
         name: "500 Mb VPU",
         price: 221.11
     },
-    "33": {
-        name: "400Mb Comercial VPU",
-        price: 0
-    },
+
     "32": {
         name: "400Mb VPU",
         price: 166.55

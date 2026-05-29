@@ -1,4 +1,6 @@
 function processData(data) {
+    currentFilteredData = data
+
     const total = data.length
 
     const won = data.filter(item =>

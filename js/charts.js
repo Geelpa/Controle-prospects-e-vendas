@@ -1,54 +1,416 @@
+const CHART_COLORS = {
+    blue: "#2563eb",
+    cyan: "#0891b2",
+    emerald: "#059669",
+    amber: "#d97706",
+    rose: "#e11d48",
+    violet: "#7c3aed",
+    slate: "#475569",
+    grid: "#e2e8f0",
+    text: "#334155",
+    muted: "#64748b"
+}
+
+const emptyStatePlugin = {
+    id: "emptyState",
+    beforeDraw(chart) {
+        const hasData = chart.data.datasets.some(dataset =>
+            dataset.data.some(value => Number(value) > 0)
+        )
+
+        if (hasData) return
+
+        const { ctx } = chart
+
+        ctx.save()
+        ctx.fillStyle = CHART_COLORS.muted
+        ctx.font = "600 14px system-ui, -apple-system, Segoe UI, sans-serif"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+        ctx.fillText(
+            "Sem dados para o filtro selecionado",
+            (chartArea.left + chartArea.right) / 2,
+            (chartArea.top + chartArea.bottom) / 2
+        )
+        ctx.restore()
+    }
+}
+
+const barValueLabelsPlugin = {
+    id: "barValueLabels",
+    afterDatasetsDraw(chart) {
+        const dataset =
+            chart.data.datasets[0]
+
+        if (!dataset || chart.config.type !== "bar") return
+
+        const values =
+            dataset.data.map(value => Number(value) || 0)
+
+        const total =
+            values.reduce((sum, value) => sum + value, 0)
+
+        if (!total) return
+
+        const meta =
+            chart.getDatasetMeta(0)
+
+        const { ctx, chartArea } = chart
+
+        ctx.save()
+        ctx.font = "700 12px Inter, system-ui, sans-serif"
+        ctx.textBaseline = "middle"
+
+        meta.data.forEach((bar, index) => {
+            const value = values[index]
+            const percent =
+                ((value / total) * 100).toFixed(1)
+            const label =
+                `${value} (${percent}%)`
+
+            ctx.textAlign = "left"
+            ctx.fillStyle = CHART_COLORS.text
+            ctx.fillText(
+                label,
+                bar.x + 8,
+                bar.y
+            )
+        })
+
+        ctx.restore()
+    }
+}
+
+const doughnutValueLabelsPlugin = {
+    id: "doughnutValueLabels",
+    afterDatasetsDraw(chart) {
+        if (chart.config.type !== "doughnut") return
+
+        const dataset =
+            chart.data.datasets[0]
+
+        if (!dataset) return
+
+        const values =
+            dataset.data.map(value => Number(value) || 0)
+
+        const total =
+            values.reduce((sum, value) => sum + value, 0)
+
+        if (!total) return
+
+        const meta =
+            chart.getDatasetMeta(0)
+
+        const { ctx } = chart
+
+        ctx.save()
+        ctx.font = "700 12px Inter, system-ui, sans-serif"
+        ctx.fillStyle = "#ffffff"
+        ctx.textAlign = "center"
+        ctx.textBaseline = "middle"
+
+        meta.data.forEach((arc, index) => {
+            const value = values[index]
+            const percent =
+                ((value / total) * 100).toFixed(1)
+            const position =
+                arc.tooltipPosition()
+
+            ctx.fillText(
+                `${value} (${percent}%)`,
+                position.x,
+                position.y
+            )
+        })
+
+        ctx.restore()
+    }
+}
+
+function getTopEntries(grouped, limit = 10) {
+    return Object.entries(grouped)
+        .filter(([label]) => label && normalize(label) !== "undefined")
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+}
+
+function wrapLabel(label, maxLength = 24) {
+    const words = String(label).split(" ")
+    const lines = []
+    let currentLine = ""
+
+    words.forEach(word => {
+        const nextLine = currentLine
+            ? `${currentLine} ${word}`
+            : word
+
+        if (nextLine.length > maxLength && currentLine) {
+            lines.push(currentLine)
+            currentLine = word
+        } else {
+            currentLine = nextLine
+        }
+    })
+
+    if (currentLine) {
+        lines.push(currentLine)
+    }
+
+    return lines
+}
+
+function baseOptions() {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 350
+        },
+        plugins: {
+            legend: {
+                display: false
+            },
+            tooltip: {
+                backgroundColor: "#0f172a",
+                titleColor: "#ffffff",
+                bodyColor: "#e2e8f0",
+                padding: 12,
+                cornerRadius: 6,
+                displayColors: false,
+                callbacks: {
+                    label(context) {
+                        return `${context.dataset.label}: ${context.parsed.x ?? context.parsed.y}`
+                    }
+                }
+            }
+        }
+    }
+}
+
+function horizontalBarOptions() {
+    return {
+        ...baseOptions(),
+        indexAxis: "y",
+        scales: {
+            x: {
+                beginAtZero: true,
+                suggestedMax: 0,
+                ticks: {
+                    precision: 0,
+                    color: CHART_COLORS.muted
+                },
+                grid: {
+                    color: CHART_COLORS.grid,
+                    drawBorder: false
+                },
+                border: {
+                    display: false
+                }
+            },
+            y: {
+                ticks: {
+                    autoSkip: false,
+                    color: CHART_COLORS.text,
+                    font: {
+                        size: 12,
+                        weight: "600"
+                    }
+                },
+                grid: {
+                    display: false
+                },
+                border: {
+                    display: false
+                }
+            }
+        }
+    }
+}
+
+function createHorizontalBarChart(canvasId, label, entries, color) {
+    const values =
+        entries.map(([_, value]) => value)
+    const maxValue =
+        Math.max(...values, 0)
+    const options =
+        horizontalBarOptions()
+
+    options.scales.x.suggestedMax =
+        maxValue ? Math.ceil(maxValue * 1.24) : 0
+
+    return new Chart(
+        document.getElementById(canvasId),
+        {
+            type: "bar",
+            data: {
+                labels: entries.map(([itemLabel]) => wrapLabel(itemLabel)),
+                datasets: [{
+                    label,
+                    data: values,
+                    backgroundColor: color,
+                    borderColor: color,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    barPercentage: 0.72,
+                    categoryPercentage: 0.72
+                }]
+            },
+            options,
+            plugins: [emptyStatePlugin, barValueLabelsPlugin]
+        }
+    )
+}
+
+function toggleChartCard(cardId, shouldShow) {
+    const card =
+        document.getElementById(cardId)
+
+    if (!card) return
+
+    card.classList.toggle("hidden", !shouldShow)
+}
+
+function hasComparisonData(entries) {
+    return entries.filter(([_, value]) =>
+        Number(value) > 0
+    ).length >= 2
+}
+
+function mainDateFiltersSelected() {
+    const month =
+        document.getElementById("monthFilter")?.value
+
+    const year =
+        document.getElementById("yearFilter")?.value
+
+    return month && year && month !== "all" && year !== "all"
+}
+
+function getSalesChartState() {
+    const salesViewFilter =
+        document.getElementById("salesViewFilter")
+
+    const weekFilter =
+        document.getElementById("weekFilter")
+
+    return {
+        view: salesViewFilter?.value || "month",
+        week: weekFilter?.value || "all"
+    }
+}
+
+function getWeekStart(date) {
+    const weekStart = new Date(
+        date.getFullYear(),
+        date.getMonth(),
+        date.getDate()
+    )
+    const day = weekStart.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+
+    weekStart.setDate(weekStart.getDate() + diff)
+
+    return weekStart
+}
+
+function formatDateKey(date) {
+    const day =
+        String(date.getDate())
+            .padStart(2, "0")
+
+    const month =
+        String(date.getMonth() + 1)
+            .padStart(2, "0")
+
+    const year =
+        date.getFullYear()
+
+    return `${year}-${month}-${day}`
+}
+
+function parseDateKey(key) {
+    const [year, month, day] =
+        key.split("-").map(Number)
+
+    return new Date(year, month - 1, day)
+}
+
+function getSalesDateKey(date) {
+    const state = getSalesChartState()
+
+    if (state.view === "month") {
+        const month =
+            String(date.getMonth() + 1)
+                .padStart(2, "0")
+
+        return `${date.getFullYear()}-${month}`
+    }
+
+    const weekStart =
+        formatDateKey(getWeekStart(date))
+
+    if (state.week === "all") {
+        return weekStart
+    }
+
+    if (state.week !== weekStart) {
+        return null
+    }
+
+    return formatDateKey(date)
+}
+
+function sortSalesDateKeys(first, second) {
+    if (first.length === 7 && second.length === 7) {
+        return first.localeCompare(second)
+    }
+
+    return parseDateKey(first) - parseDateKey(second)
+}
+
+function formatSalesDateLabel(key) {
+    if (key.length === 7) {
+        const [year, month] = key.split("-")
+
+        return `${MONTH_MAP[Number(month)]}/${year}`
+    }
+
+    const [year, month, day] = key.split("-")
+    const state = getSalesChartState()
+
+    if (state.view === "week" && state.week === "all") {
+        const weekStart = parseDateKey(key)
+        const weekEnd = parseDateKey(key)
+
+        weekEnd.setDate(weekEnd.getDate() + 6)
+
+        return `${String(weekStart.getDate()).padStart(2, "0")}/${String(weekStart.getMonth() + 1).padStart(2, "0")} a ${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`
+    }
+
+    return `${day}/${month}/${year}`
+}
+
 function createChannelsChart(data) {
 
     destroyChart(channelsChart)
 
     const grouped = groupBy(data, COLUMN_MAP.canal)
+    const entries = getTopEntries(grouped, 8)
 
-    channelsChart = new Chart(
-        document.getElementById("channelsChart"),
-        {
-            type: "bar",
+    if (!hasComparisonData(entries)) {
+        toggleChartCard("channelsChartCard", false)
+        return
+    }
 
-            data: {
-                labels: Object.keys(grouped),
+    toggleChartCard("channelsChartCard", true)
 
-                datasets: [{
-                    label: "Canais",
-                    data: Object.values(grouped)
-                }]
-            },
-
-            options: {
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: "##000"
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    }
-                }
-            }
-        }
+    channelsChart = createHorizontalBarChart(
+        "channelsChart",
+        "Leads",
+        entries,
+        CHART_COLORS.cyan
     )
 }
 
@@ -57,52 +419,20 @@ function createCampaignsChart(data) {
     destroyChart(campaignsChart)
 
     const grouped = groupBy(data, COLUMN_MAP.campanha)
+    const entries = getTopEntries(grouped, 8)
 
-    campaignsChart = new Chart(
-        document.getElementById("campaignsChart"),
-        {
-            type: "bar",
+    if (!hasComparisonData(entries)) {
+        toggleChartCard("campaignsChartCard", false)
+        return
+    }
 
-            data: {
-                labels: Object.keys(grouped),
+    toggleChartCard("campaignsChartCard", true)
 
-                datasets: [{
-                    label: "Campanhas",
-                    data: Object.values(grouped)
-                }]
-            },
-
-            options: {
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: "##000"
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    }
-                }
-            }
-        }
+    campaignsChart = createHorizontalBarChart(
+        "campaignsChart",
+        "Leads",
+        entries,
+        CHART_COLORS.violet
     )
 }
 
@@ -120,58 +450,31 @@ function createLossReasonsChart(data) {
         lostOnly,
         COLUMN_MAP.motivoPerda
     )
+    const entries = getTopEntries(grouped, 8)
 
-    lossReasonsChart = new Chart(
-        document.getElementById("lossReasonsChart"),
-        {
-            type: "bar",
+    if (!hasComparisonData(entries)) {
+        toggleChartCard("lossReasonsChartCard", false)
+        return
+    }
 
-            data: {
-                labels: Object.keys(grouped),
+    toggleChartCard("lossReasonsChartCard", true)
 
-                datasets: [{
-                    label: "Motivos",
-                    data: Object.values(grouped)
-                }]
-            },
-
-            options: {
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: "##000"
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            color: "##000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    }
-                }
-            }
-        }
+    lossReasonsChart = createHorizontalBarChart(
+        "lossReasonsChart",
+        "Perdas",
+        entries,
+        CHART_COLORS.rose
     )
 }
 
 function createSalesPerDayChart(data) {
 
     destroyChart(salesPerDayChart)
+
+    if (!mainDateFiltersSelected()) {
+        toggleChartCard("salesPerDayChartCard", false)
+        return
+    }
 
     const wonOnly = data.filter(item =>
         STATUS.won.includes(
@@ -188,39 +491,28 @@ function createSalesPerDayChart(data) {
 
         if (!parsedDate) return
 
-        const day =
-            String(parsedDate.getDate())
-                .padStart(2, "0")
-
-        const month =
-            String(parsedDate.getMonth() + 1)
-                .padStart(2, "0")
-
-        const year =
-            parsedDate.getFullYear()
-
         const key =
-            `${year}-${month}-${day}`
+            getSalesDateKey(parsedDate)
+
+        if (!key) return
 
         grouped[key] =
             (grouped[key] || 0) + 1
     })
 
-    // ORDENA DATAS
     const sortedEntries =
         Object.entries(grouped)
-            .sort((a, b) =>
-                new Date(a[0]) - new Date(b[0])
-            )
+            .sort((a, b) => sortSalesDateKeys(a[0], b[0]))
+
+    if (!hasComparisonData(sortedEntries)) {
+        toggleChartCard("salesPerDayChartCard", false)
+        return
+    }
+
+    toggleChartCard("salesPerDayChartCard", true)
 
     const labels =
-        sortedEntries.map(([date]) => {
-
-            const [year, month, day] =
-                date.split("-")
-
-            return `${day}/${month}/${year}`
-        })
+        sortedEntries.map(([date]) => formatSalesDateLabel(date))
 
     const values =
         sortedEntries.map(([_, value]) => value)
@@ -236,18 +528,30 @@ function createSalesPerDayChart(data) {
                 datasets: [{
                     label: "Vendas",
                     data: values,
-                    tension: 0.3
+                    tension: 0.35,
+                    fill: true,
+                    borderColor: CHART_COLORS.emerald,
+                    backgroundColor: "rgba(5, 150, 105, 0.14)",
+                    pointBackgroundColor: "#ffffff",
+                    pointBorderColor: CHART_COLORS.emerald,
+                    pointBorderWidth: 2,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    borderWidth: 3
                 }]
             },
 
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                ...baseOptions(),
 
                 plugins: {
-                    legend: {
-                        labels: {
-                            color: "#000"
+                    ...baseOptions().plugins,
+                    tooltip: {
+                        ...baseOptions().plugins.tooltip,
+                        callbacks: {
+                            label(context) {
+                                return `Vendas: ${context.parsed.y}`
+                            }
                         }
                     }
                 },
@@ -255,23 +559,36 @@ function createSalesPerDayChart(data) {
                 scales: {
                     x: {
                         ticks: {
-                            color: "#000"
+                            color: CHART_COLORS.muted,
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 7
                         },
                         grid: {
-                            color: "rgba(255,255,255,0.05)"
+                            display: false
+                        },
+                        border: {
+                            display: false
                         }
                     },
 
                     y: {
+                        beginAtZero: true,
                         ticks: {
-                            color: "#000"
+                            precision: 0,
+                            color: CHART_COLORS.muted
                         },
                         grid: {
-                            color: "rgba(255,255,255,0.05)"
+                            color: CHART_COLORS.grid,
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
                         }
                     }
                 }
-            }
+            },
+            plugins: [emptyStatePlugin, doughnutValueLabelsPlugin]
         }
     )
 }
@@ -279,6 +596,24 @@ function createSalesPerDayChart(data) {
 function createSellersChart(data) {
 
     destroyChart(sellersChart)
+
+    const card =
+        document.getElementById("sellersChartCard")
+
+    const sellerFilter =
+        document.getElementById("sellerFilter")
+
+    if (sellerFilter && sellerFilter.value !== "all") {
+        if (card) {
+            card.classList.add("hidden")
+        }
+
+        return
+    }
+
+    if (card) {
+        card.classList.remove("hidden")
+    }
 
     const wonOnly = data.filter(item =>
         STATUS.won.includes(
@@ -290,55 +625,20 @@ function createSellersChart(data) {
         wonOnly,
         COLUMN_MAP.vendedor
     )
+    const entries = getTopEntries(grouped, 8)
 
-    sellersChart = new Chart(
-        document.getElementById("sellersChart"),
-        {
-            type: "bar",
+    if (!hasComparisonData(entries)) {
+        toggleChartCard("sellersChartCard", false)
+        return
+    }
 
-            data: {
-                labels: Object.keys(grouped),
+    toggleChartCard("sellersChartCard", true)
 
-                datasets: [{
-                    label: "Vendas",
-                    data: Object.values(grouped)
-                }]
-            },
-
-            options: {
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
-
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: "#000"
-                        }
-                    }
-                },
-
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "#000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    },
-
-                    y: {
-                        ticks: {
-                            color: "#000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    }
-                }
-            }
-        }
+    sellersChart = createHorizontalBarChart(
+        "sellersChart",
+        "Vendas",
+        entries,
+        CHART_COLORS.blue
     )
 }
 
@@ -373,6 +673,13 @@ function createInstallationChart(data) {
         }
     })
 
+    if ([paid, free].filter(value => value > 0).length < 2) {
+        toggleChartCard("installationChartCard", false)
+        return
+    }
+
+    toggleChartCard("installationChartCard", true)
+
     installationChart = new Chart(
         document.getElementById("installationChart"),
         {
@@ -380,27 +687,79 @@ function createInstallationChart(data) {
 
             data: {
                 labels: [
-                    "Taxa Paga",
-                    "Taxa Isenta"
+                    "Taxa paga",
+                    "Taxa isenta"
                 ],
 
                 datasets: [{
-                    data: [paid, free]
+                    data: [paid, free],
+                    backgroundColor: [
+                        CHART_COLORS.emerald,
+                        CHART_COLORS.amber
+                    ],
+                    borderColor: "#ffffff",
+                    borderWidth: 4,
+                    hoverOffset: 6
                 }]
             },
 
             options: {
-                responsive: true,
-                maintainAspectRatio: false,
+                ...baseOptions(),
+                cutout: "68%",
+                onClick(event, elements) {
+                    if (!elements.length || typeof openProspectList !== "function") {
+                        return
+                    }
 
+                    const index =
+                        elements[0].index
+
+                    openProspectList(
+                        index === 0
+                            ? "installationPaid"
+                            : "installationFree"
+                    )
+                },
+                onHover(event, elements) {
+                    event.native.target.style.cursor =
+                        elements.length ? "pointer" : "default"
+                },
                 plugins: {
+                    ...baseOptions().plugins,
                     legend: {
+                        display: true,
+                        position: "bottom",
                         labels: {
-                            color: "#000"
+                            color: CHART_COLORS.text,
+                            usePointStyle: true,
+                            pointStyle: "circle",
+                            padding: 18,
+                            font: {
+                                size: 12,
+                                weight: "600"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        ...baseOptions().plugins.tooltip,
+                        callbacks: {
+                            label(context) {
+                                const total = context.dataset.data.reduce(
+                                    (sum, value) => sum + value,
+                                    0
+                                )
+                                const value = context.parsed
+                                const percent = total
+                                    ? ((value / total) * 100).toFixed(1)
+                                    : "0.0"
+
+                                return `${context.label}: ${value} (${percent}%)`
+                            }
                         }
                     }
                 }
-            }
+            },
+            plugins: [emptyStatePlugin]
         }
     )
 }
@@ -409,64 +768,51 @@ function createPlansChart(data) {
 
     destroyChart(plansChart)
 
+    const card =
+        document.getElementById("plansChartCard")
+
     const wonOnly = data.filter(item =>
         STATUS.won.includes(
             normalize(item[COLUMN_MAP.status])
         )
     )
 
+    const wonWithPlan = wonOnly.filter(item => {
+        const planId = item[COLUMN_MAP.plano]
+
+        return String(planId || "").trim() !== ""
+    })
+
+    if (!wonWithPlan.length) {
+        if (card) {
+            card.classList.add("hidden")
+        }
+
+        return
+    }
+
+    if (card) {
+        card.classList.remove("hidden")
+    }
+
     const grouped = groupBy(
-        wonOnly,
+        wonWithPlan,
         COLUMN_MAP.plano
     )
+    const entries = getTopEntries(grouped, 10)
 
-    plansChart = new Chart(
-        document.getElementById("plansChart"),
-        {
-            type: "bar",
-
-            data: {
-                labels: Object.keys(grouped),
-
-                datasets: [{
-                    label: "Planos",
-                    data: Object.values(grouped)
-                }]
-            },
-
-            options: {
-                indexAxis: "y",
-                responsive: true,
-                maintainAspectRatio: false,
-
-                plugins: {
-                    legend: {
-                        labels: {
-                            color: "#000"
-                        }
-                    }
-                },
-
-                scales: {
-                    x: {
-                        ticks: {
-                            color: "#000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    },
-
-                    y: {
-                        ticks: {
-                            color: "#000"
-                        },
-                        grid: {
-                            color: "rgba(255,255,255,0.05)"
-                        }
-                    }
-                }
-            }
+    if (!hasComparisonData(entries)) {
+        if (card) {
+            card.classList.add("hidden")
         }
+
+        return
+    }
+
+    plansChart = createHorizontalBarChart(
+        "plansChart",
+        "Vendas",
+        entries,
+        CHART_COLORS.emerald
     )
 }

@@ -25,6 +25,8 @@ function handleFile(event) {
 
             populateFilters(rawData)
 
+            showDashboard()
+
             applyFilters()
         },
 
@@ -36,4 +38,20 @@ function handleFile(event) {
             )
         }
     })
+}
+
+function showDashboard() {
+    const emptyState =
+        document.getElementById("emptyState")
+
+    const dashboardContent =
+        document.getElementById("dashboardContent")
+
+    if (emptyState) {
+        emptyState.classList.add("hidden")
+    }
+
+    if (dashboardContent) {
+        dashboardContent.classList.remove("hidden")
+    }
 }

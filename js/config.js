@@ -1,6 +1,7 @@
 let sellersChart
 let installationChart
 let rawData = []
+let currentFilteredData = []
 const COLUMN_MAP = {
     canal: "Canal de venda",
     campanha: "Campanha",
