@@ -1,4 +1,5 @@
 const CAMPAIGN_MAP = {
+    "29": "Troca de titularidade",
     "27": "TAXA ISENTA - INDICAÇÃO",
     "26": "TAXA PAGA - R$50,00 OFF 3x",
     "25": "TAXA ISENTA - 3 COMPROVANTES DE PGTO",
@@ -19,7 +20,7 @@ const CAMPAIGN_MAP = {
     "10": "BLACK FRIDAY TAXA ISENTA",
     "8": "BLACK FRIDAY CASHBACK",
     "7": "Taxa Isenta Promocional",
-    "6": "Colaborador VPu",
+    "6": "Colaborador VPU",
     "5": "Negociação",
     "4": "Aniversário 2024",
     "3": "Melhor Plano Net",
