@@ -21,7 +21,7 @@ function handleFile(event) {
                     .some(value =>
                         String(value || "").trim() !== ""
                     )
-            })
+            }).map(applyBusinessRules)
 
             populateFilters(rawData)
 

@@ -29,6 +29,7 @@ const LIST_COLUMN_CANDIDATES = [
     "Telefone",
     "Celular",
     COLUMN_MAP.status,
+    COLUMN_MAP.motivoPerda,
     COLUMN_MAP.vendedor,
     COLUMN_MAP.plano,
     COLUMN_MAP.canal,
@@ -47,6 +48,17 @@ const LIST_COLUMN_CANDIDATES = [
 
 function openProspectList(type) {
     const rows = getRowsByDrilldownType(type)
+
+    openProspectListForRows(
+        DRILLDOWN_TITLES[type] || "Prospects",
+        rows,
+        {
+            hiddenColumns: getHiddenColumnsByDrilldownType(type)
+        }
+    )
+}
+
+function openProspectListForRows(modalTitle, rows, options = {}) {
     const modal = document.getElementById("prospectModal")
     const title = document.getElementById("prospectModalTitle")
     const count = document.getElementById("prospectModalCount")
@@ -54,14 +66,35 @@ function openProspectList(type) {
     if (!modal) return
 
     title.textContent =
-        DRILLDOWN_TITLES[type] || "Prospects"
+        modalTitle || "Prospects"
 
     count.textContent =
         `${rows.length} ${rows.length === 1 ? "registro" : "registros"}`
 
-    renderProspectTable(rows)
+    renderProspectTable(rows, options)
 
     modal.classList.remove("hidden")
+}
+
+function getHiddenColumnsByDrilldownType(type) {
+    const statusDrilldowns = [
+        "inProgress",
+        "won",
+        "lost",
+        "noViability"
+    ]
+
+    const hiddenColumns = []
+
+    if (statusDrilldowns.includes(type)) {
+        hiddenColumns.push(COLUMN_MAP.status)
+    }
+
+    if (type === "inProgress" || type === "noViability") {
+        hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    }
+
+    return hiddenColumns
 }
 
 function closeProspectList() {
@@ -139,7 +172,7 @@ function isFreeInstallation(item) {
         .includes("isenta")
 }
 
-function renderProspectTable(rows) {
+function renderProspectTable(rows, options = {}) {
     const header = document.getElementById("prospectListHeader")
     const body = document.getElementById("prospectListBody")
     const empty = document.getElementById("prospectModalEmpty")
@@ -151,7 +184,15 @@ function renderProspectTable(rows) {
 
     empty.classList.toggle("hidden", rows.length > 0)
 
+    const hiddenColumns =
+        options.hiddenColumns || []
+
     const columns = getListColumns(rows)
+        .filter(column =>
+            !hiddenColumns.some(hiddenColumn =>
+                normalize(hiddenColumn) === normalize(column)
+            )
+        )
 
     columns.forEach(column => {
         const cell = document.createElement("th")

@@ -10,6 +10,25 @@ function destroyChart(chart) {
     }
 }
 
+function applyBusinessRules(row) {
+    if (isOwnershipTransferChannel(row)) {
+        row[COLUMN_MAP.campanha] = "29"
+    }
+
+    return row
+}
+
+function isOwnershipTransferChannel(row) {
+    const channelId =
+        row[COLUMN_MAP.canal]
+
+    const channelName =
+        CHANNEL_MAP[channelId] || channelId || ""
+
+    return normalize(channelId) === "40" ||
+        normalize(channelName) === "troca de titularidade"
+}
+
 function parseDate(dateString) {
 
     if (!dateString) return null

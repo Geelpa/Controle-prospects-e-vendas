@@ -28,11 +28,13 @@ function processData(data) {
     ).length
 
     // CONVERSÃO REAL
-    const validLeads = won + lost
+    const workableSales = data.filter(item =>
+        isWorkableSaleStatus(item)
+    ).length
 
     const conversion =
-        validLeads > 0
-            ? ((won / validLeads) * 100).toFixed(1)
+        workableSales > 0
+            ? ((won / workableSales) * 100).toFixed(1)
             : 0
 
     const wonOnly = data.filter(item =>
@@ -99,6 +101,8 @@ function processData(data) {
             )
     })
 
+    renderPodiums(data)
+
     createChannelsChart(data)
     createCampaignsChart(data)
     createLossReasonsChart(data)
@@ -106,4 +110,144 @@ function processData(data) {
     createSellersChart(data)
     createInstallationChart(data)
     createPlansChart(data)
+}
+
+function renderPodiums(data) {
+    const rankingGroups =
+        getPodiumRankingGroups(data)
+
+    const bestItems =
+        rankingGroups
+            .map(group => {
+                const first =
+                    group.entries[0]
+
+                if (!first) return null
+
+                return {
+                    title: group.title,
+                    label: first[0],
+                    value: first[1],
+                    unit: group.unit
+                }
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 3)
+
+    renderPodiumList("bestPodiumList", bestItems)
+}
+
+function getPodiumRankingGroups(data) {
+    const wonOnly = data.filter(item =>
+        STATUS.won.includes(
+            normalize(item[COLUMN_MAP.status])
+        )
+    )
+
+    const wonWithPlan = wonOnly.filter(item =>
+        String(item[COLUMN_MAP.plano] || "").trim() !== ""
+    )
+
+    const lostOnly = data.filter(item =>
+        STATUS.lost.includes(
+            normalize(item[COLUMN_MAP.status])
+        )
+    )
+
+    return [
+        {
+            title: "Planos",
+            unit: "vendas",
+            entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
+        },
+        {
+            title: "Vendedores",
+            unit: "vendas",
+            entries: getRankingEntries(groupBy(wonOnly, COLUMN_MAP.vendedor), 8)
+        },
+        {
+            title: "Canais",
+            unit: "leads",
+            entries: getRankingEntries(groupBy(data, COLUMN_MAP.canal), 8)
+        },
+        {
+            title: "Campanhas",
+            unit: "leads",
+            entries: getRankingEntries(groupBy(data, COLUMN_MAP.campanha), 8)
+        },
+        {
+            title: "Motivos de Perda",
+            unit: "perdas",
+            entries: getRankingEntries(groupBy(lostOnly, COLUMN_MAP.motivoPerda), 8)
+        }
+    ]
+}
+
+function isWorkableSaleStatus(item) {
+    const status =
+        normalize(item[COLUMN_MAP.status])
+
+    return STATUS.won.includes(status) ||
+        STATUS.lost.includes(status)
+}
+
+function getRankingEntries(grouped, limit) {
+    return Object.entries(grouped)
+        .filter(([label, value]) =>
+            label &&
+            normalize(label) !== "undefined" &&
+            Number(value) > 0
+        )
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, limit)
+}
+
+function renderPodiumList(containerId, items) {
+    const container =
+        document.getElementById(containerId)
+
+    if (!container) return
+
+    container.innerHTML = ""
+
+    if (!items.length) {
+        const empty = document.createElement("p")
+
+        empty.className = "text-xs text-slate-500"
+        empty.textContent = "Sem dados suficientes para este filtro."
+
+        container.appendChild(empty)
+        return
+    }
+
+    items.forEach((item, index) => {
+        const card = document.createElement("div")
+        const rank = document.createElement("div")
+        const content = document.createElement("div")
+        const title = document.createElement("p")
+        const label = document.createElement("p")
+        const value = document.createElement("p")
+
+        card.className = "border border-slate-200 rounded-lg px-2.5 py-2 flex gap-2 items-center min-w-0"
+        rank.className = "shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"
+        content.className = "min-w-0 flex-1"
+        title.className = "text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-tight"
+        label.className = "text-xs font-semibold text-slate-900 truncate leading-tight"
+        value.className = "text-xs font-semibold text-emerald-700 leading-tight"
+
+        rank.textContent = `${index + 1}º`
+        title.textContent = item.title
+        label.textContent = item.label
+        value.textContent = `${item.value} ${item.unit}`
+
+        content.appendChild(title)
+        content.appendChild(label)
+        content.appendChild(value)
+
+        card.appendChild(rank)
+        card.appendChild(content)
+
+        container.appendChild(card)
+    })
 }

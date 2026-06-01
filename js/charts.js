@@ -228,7 +228,7 @@ function horizontalBarOptions() {
     }
 }
 
-function createHorizontalBarChart(canvasId, label, entries, color) {
+function createHorizontalBarChart(canvasId, label, entries, color, onSelectEntry) {
     const values =
         entries.map(([_, value]) => value)
     const maxValue =
@@ -238,6 +238,24 @@ function createHorizontalBarChart(canvasId, label, entries, color) {
 
     options.scales.x.suggestedMax =
         maxValue ? Math.ceil(maxValue * 1.24) : 0
+
+    if (typeof onSelectEntry === "function") {
+        options.onClick = (event, elements) => {
+            if (!elements.length) return
+
+            const entry =
+                entries[elements[0].index]
+
+            if (entry) {
+                onSelectEntry(entry[0])
+            }
+        }
+
+        options.onHover = (event, elements) => {
+            event.native.target.style.cursor =
+                elements.length ? "pointer" : "default"
+        }
+    }
 
     return new Chart(
         document.getElementById(canvasId),
@@ -261,6 +279,44 @@ function createHorizontalBarChart(canvasId, label, entries, color) {
             plugins: [emptyStatePlugin, barValueLabelsPlugin]
         }
     )
+}
+
+function getChartDisplayValue(item, columnName) {
+    let key = item[columnName]
+
+    if (columnName === COLUMN_MAP.plano) {
+        return PLAN_MAP[key]?.name || key || "Sem plano"
+    }
+
+    if (columnName === COLUMN_MAP.campanha) {
+        return CAMPAIGN_MAP[key] || `Campanha ${key}`
+    }
+
+    if (columnName === COLUMN_MAP.canal) {
+        return CHANNEL_MAP[key] || `Canal ${key}`
+    }
+
+    if (columnName === COLUMN_MAP.vendedor) {
+        return SELLER_MAP[key] || `Vendedor ${key}`
+    }
+
+    return key || "Sem registro"
+}
+
+function rowsMatchingChartValue(data, columnName, label, rowFilter) {
+    return data.filter(item => {
+        if (typeof rowFilter === "function" && !rowFilter(item)) {
+            return false
+        }
+
+        return normalize(getChartDisplayValue(item, columnName)) === normalize(label)
+    })
+}
+
+function openChartRows(title, rows) {
+    if (typeof openProspectListForRows === "function") {
+        openProspectListForRows(title, rows)
+    }
 }
 
 function toggleChartCard(cardId, shouldShow) {
@@ -410,7 +466,11 @@ function createChannelsChart(data) {
         "channelsChart",
         "Leads",
         entries,
-        CHART_COLORS.cyan
+        CHART_COLORS.cyan,
+        label => openChartRows(
+            `Canal: ${label}`,
+            rowsMatchingChartValue(data, COLUMN_MAP.canal, label)
+        )
     )
 }
 
@@ -432,7 +492,11 @@ function createCampaignsChart(data) {
         "campaignsChart",
         "Leads",
         entries,
-        CHART_COLORS.violet
+        CHART_COLORS.violet,
+        label => openChartRows(
+            `Campanha: ${label}`,
+            rowsMatchingChartValue(data, COLUMN_MAP.campanha, label)
+        )
     )
 }
 
@@ -463,7 +527,11 @@ function createLossReasonsChart(data) {
         "lossReasonsChart",
         "Perdas",
         entries,
-        CHART_COLORS.rose
+        CHART_COLORS.rose,
+        label => openChartRows(
+            `Motivo de perda: ${label}`,
+            rowsMatchingChartValue(lostOnly, COLUMN_MAP.motivoPerda, label)
+        )
     )
 }
 
@@ -543,6 +611,30 @@ function createSalesPerDayChart(data) {
 
             options: {
                 ...baseOptions(),
+                onClick(event, elements) {
+                    if (!elements.length) return
+
+                    const key =
+                        sortedEntries[elements[0].index]?.[0]
+
+                    if (!key) return
+
+                    const rows = wonOnly.filter(item => {
+                        const parsedDate =
+                            extractBestDate(item)
+
+                        return parsedDate && getSalesDateKey(parsedDate) === key
+                    })
+
+                    openChartRows(
+                        `Vendas em ${formatSalesDateLabel(key)}`,
+                        rows
+                    )
+                },
+                onHover(event, elements) {
+                    event.native.target.style.cursor =
+                        elements.length ? "pointer" : "default"
+                },
 
                 plugins: {
                     ...baseOptions().plugins,
@@ -638,7 +730,11 @@ function createSellersChart(data) {
         "sellersChart",
         "Vendas",
         entries,
-        CHART_COLORS.blue
+        CHART_COLORS.blue,
+        label => openChartRows(
+            `Vendedor: ${label}`,
+            rowsMatchingChartValue(wonOnly, COLUMN_MAP.vendedor, label)
+        )
     )
 }
 
@@ -813,6 +909,10 @@ function createPlansChart(data) {
         "plansChart",
         "Vendas",
         entries,
-        CHART_COLORS.emerald
+        CHART_COLORS.emerald,
+        label => openChartRows(
+            `Plano: ${label}`,
+            rowsMatchingChartValue(wonWithPlan, COLUMN_MAP.plano, label)
+        )
     )
 }
