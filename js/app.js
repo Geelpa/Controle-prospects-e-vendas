@@ -214,7 +214,7 @@ function renderPodiumList(containerId, items) {
     if (!items.length) {
         const empty = document.createElement("p")
 
-        empty.className = "text-xs text-slate-500"
+        empty.className = "text-xs text-slate-300"
         empty.textContent = "Sem dados suficientes para este filtro."
 
         container.appendChild(empty)
@@ -229,12 +229,12 @@ function renderPodiumList(containerId, items) {
         const label = document.createElement("p")
         const value = document.createElement("p")
 
-        card.className = "border border-slate-200 rounded-lg px-2.5 py-2 flex gap-2 items-center min-w-0"
-        rank.className = "shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-100"
+        card.className = "bg-green-500 rounded-lg px-3 py-2 flex gap-2.5 items-center min-w-0"
+        rank.className = "shrink-0 w-7 h-7 rounded flex items-center justify-center text-xs font-bold bg-green-600 text-white"
         content.className = "min-w-0 flex-1"
-        title.className = "text-[11px] font-semibold text-slate-500 uppercase tracking-wide leading-tight"
-        label.className = "text-xs font-semibold text-slate-900 truncate leading-tight"
-        value.className = "text-xs font-semibold text-emerald-700 leading-tight"
+        title.className = "text-[12px] font-semibold text-white uppercase tracking-wide leading-tight text-green-950"
+        label.className = "text-[16px] font-semibold text-white truncate leading-tight"
+        value.className = "text-xs font-semibold text-green-950 leading-tight"
 
         rank.textContent = `${index + 1}º`
         title.textContent = item.title

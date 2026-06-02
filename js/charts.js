@@ -81,6 +81,79 @@ const barValueLabelsPlugin = {
     }
 }
 
+const stackedBarValueLabelsPlugin = {
+    id: "stackedBarValueLabels",
+    afterDatasetsDraw(chart) {
+        if (chart.config.type !== "bar") return
+
+        const datasets =
+            chart.data.datasets || []
+
+        if (datasets.length < 2) return
+
+        const { ctx } = chart
+
+        ctx.save()
+        ctx.font = "700 12px Inter, system-ui, sans-serif"
+        ctx.textBaseline = "middle"
+
+        const totals =
+            chart.data.labels.map((_, index) =>
+                datasets.reduce(
+                    (sum, dataset) => sum + (Number(dataset.data[index]) || 0),
+                    0
+                )
+            )
+
+        datasets.forEach((dataset, datasetIndex) => {
+            const meta =
+                chart.getDatasetMeta(datasetIndex)
+
+            meta.data.forEach((bar, index) => {
+                const value =
+                    Number(dataset.data[index]) || 0
+
+                if (!value) return
+
+                const width =
+                    Math.abs(bar.x - bar.base)
+
+                if (width < 32) return
+
+                ctx.textAlign = "center"
+                ctx.fillStyle = "#ffffff"
+                ctx.fillText(
+                    value,
+                    bar.base + ((bar.x - bar.base) / 2),
+                    bar.y
+                )
+            })
+        })
+
+        const lastDataset =
+            datasets[datasets.length - 1]
+        const lastMeta =
+            chart.getDatasetMeta(datasets.length - 1)
+
+        lastMeta.data.forEach((bar, index) => {
+            const total =
+                totals[index]
+
+            if (!total) return
+
+            ctx.textAlign = "left"
+            ctx.fillStyle = CHART_COLORS.text
+            ctx.fillText(
+                `Total ${total}`,
+                bar.x + 8,
+                bar.y
+            )
+        })
+
+        ctx.restore()
+    }
+}
+
 const doughnutValueLabelsPlugin = {
     id: "doughnutValueLabels",
     afterDatasetsDraw(chart) {
@@ -281,6 +354,138 @@ function createHorizontalBarChart(canvasId, label, entries, color, onSelectEntry
     )
 }
 
+function createSplitStatusBarChart(canvasId, entries, onSelectEntry) {
+    const maxValue =
+        Math.max(...entries.map(entry => entry.total), 0)
+    const options =
+        horizontalBarOptions()
+
+    options.scales.x.stacked = true
+    options.scales.y.stacked = true
+    options.scales.x.suggestedMax =
+        maxValue ? Math.ceil(maxValue * 1.28) : 0
+    options.scales.x.ticks.display = false
+    options.scales.x.grid.display = false
+
+    options.plugins.legend = {
+        display: true,
+        position: "top",
+        align: "end",
+        labels: {
+            color: CHART_COLORS.text,
+            usePointStyle: true,
+            pointStyle: "circle",
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 12,
+            font: {
+                size: 12,
+                weight: "600"
+            }
+        }
+    }
+
+    options.plugins.tooltip = {
+        ...baseOptions().plugins.tooltip,
+        displayColors: true,
+        callbacks: {
+            title(context) {
+                return entries[context[0].dataIndex]?.label || ""
+            },
+            label(context) {
+                const value =
+                    Number(context.parsed.x) || 0
+                const entry =
+                    entries[context.dataIndex]
+                const percent =
+                    entry?.total
+                        ? ((value / entry.total) * 100).toFixed(1)
+                        : "0.0"
+
+                return `${context.dataset.label}: ${value} (${percent}%)`
+            },
+            afterBody(context) {
+                const entry =
+                    entries[context[0].dataIndex]
+
+                return entry
+                    ? [`Total: ${entry.total}`]
+                    : []
+            }
+        }
+    }
+
+    if (typeof onSelectEntry === "function") {
+        options.onClick = (event, elements) => {
+            if (!elements.length) return
+
+            const element =
+                elements[0]
+            const entry =
+                entries[element.index]
+            const dataset =
+                element.datasetIndex === 0
+                    ? "won"
+                    : "lost"
+
+            if (entry) {
+                onSelectEntry(entry.label, dataset)
+            }
+        }
+
+        options.onHover = (event, elements) => {
+            event.native.target.style.cursor =
+                elements.length ? "pointer" : "default"
+        }
+    }
+
+    return new Chart(
+        document.getElementById(canvasId),
+        {
+            type: "bar",
+            data: {
+                labels: entries.map(entry => wrapLabel(entry.label)),
+                datasets: [
+                    {
+                        label: "Vencemos",
+                        data: entries.map(entry => entry.won),
+                        backgroundColor: CHART_COLORS.emerald,
+                        borderColor: CHART_COLORS.emerald,
+                        borderWidth: 0,
+                        borderRadius: {
+                            topLeft: 6,
+                            bottomLeft: 6,
+                            topRight: 0,
+                            bottomRight: 0
+                        },
+                        borderSkipped: false,
+                        barPercentage: 0.64,
+                        categoryPercentage: 0.76
+                    },
+                    {
+                        label: "Perdemos",
+                        data: entries.map(entry => entry.lost),
+                        backgroundColor: CHART_COLORS.rose,
+                        borderColor: CHART_COLORS.rose,
+                        borderWidth: 0,
+                        borderRadius: {
+                            topLeft: 0,
+                            bottomLeft: 0,
+                            topRight: 6,
+                            bottomRight: 6
+                        },
+                        borderSkipped: false,
+                        barPercentage: 0.64,
+                        categoryPercentage: 0.76
+                    }
+                ]
+            },
+            options,
+            plugins: [emptyStatePlugin, stackedBarValueLabelsPlugin]
+        }
+    )
+}
+
 function getChartDisplayValue(item, columnName) {
     let key = item[columnName]
 
@@ -317,6 +522,71 @@ function openChartRows(title, rows) {
     if (typeof openProspectListForRows === "function") {
         openProspectListForRows(title, rows)
     }
+}
+
+function isWonStatus(item) {
+    return STATUS.won.includes(
+        normalize(item[COLUMN_MAP.status])
+    )
+}
+
+function isLostStatus(item) {
+    return STATUS.lost.includes(
+        normalize(item[COLUMN_MAP.status])
+    )
+}
+
+function getSplitStatusEntries(data, columnName, limit = 8) {
+    const grouped = {}
+
+    data.forEach(item => {
+        if (!isWonStatus(item) && !isLostStatus(item)) return
+
+        const label =
+            getChartDisplayValue(item, columnName)
+
+        if (!label || normalize(label) === "undefined") return
+
+        if (!grouped[label]) {
+            grouped[label] = {
+                label,
+                won: 0,
+                lost: 0,
+                total: 0
+            }
+        }
+
+        if (isWonStatus(item)) {
+            grouped[label].won++
+        }
+
+        if (isLostStatus(item)) {
+            grouped[label].lost++
+        }
+
+        grouped[label].total++
+    })
+
+    return Object.values(grouped)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, limit)
+}
+
+function hasSplitComparisonData(entries) {
+    return entries.filter(entry =>
+        Number(entry.total) > 0
+    ).length >= 2
+}
+
+function rowsMatchingChartStatus(data, columnName, label, statusType) {
+    return rowsMatchingChartValue(
+        data,
+        columnName,
+        label,
+        item => statusType === "won"
+            ? isWonStatus(item)
+            : isLostStatus(item)
+    )
 }
 
 function toggleChartCard(cardId, shouldShow) {
@@ -452,24 +722,22 @@ function createChannelsChart(data) {
 
     destroyChart(channelsChart)
 
-    const grouped = groupBy(data, COLUMN_MAP.canal)
-    const entries = getTopEntries(grouped, 8)
+    const entries =
+        getSplitStatusEntries(data, COLUMN_MAP.canal, 8)
 
-    if (!hasComparisonData(entries)) {
+    if (!hasSplitComparisonData(entries)) {
         toggleChartCard("channelsChartCard", false)
         return
     }
 
     toggleChartCard("channelsChartCard", true)
 
-    channelsChart = createHorizontalBarChart(
+    channelsChart = createSplitStatusBarChart(
         "channelsChart",
-        "Leads",
         entries,
-        CHART_COLORS.cyan,
-        label => openChartRows(
-            `Canal: ${label}`,
-            rowsMatchingChartValue(data, COLUMN_MAP.canal, label)
+        (label, statusType) => openChartRows(
+            `Canal: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
+            rowsMatchingChartStatus(data, COLUMN_MAP.canal, label, statusType)
         )
     )
 }
@@ -478,24 +746,22 @@ function createCampaignsChart(data) {
 
     destroyChart(campaignsChart)
 
-    const grouped = groupBy(data, COLUMN_MAP.campanha)
-    const entries = getTopEntries(grouped, 8)
+    const entries =
+        getSplitStatusEntries(data, COLUMN_MAP.campanha, 8)
 
-    if (!hasComparisonData(entries)) {
+    if (!hasSplitComparisonData(entries)) {
         toggleChartCard("campaignsChartCard", false)
         return
     }
 
     toggleChartCard("campaignsChartCard", true)
 
-    campaignsChart = createHorizontalBarChart(
+    campaignsChart = createSplitStatusBarChart(
         "campaignsChart",
-        "Leads",
         entries,
-        CHART_COLORS.violet,
-        label => openChartRows(
-            `Campanha: ${label}`,
-            rowsMatchingChartValue(data, COLUMN_MAP.campanha, label)
+        (label, statusType) => openChartRows(
+            `Campanha: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
+            rowsMatchingChartStatus(data, COLUMN_MAP.campanha, label, statusType)
         )
     )
 }

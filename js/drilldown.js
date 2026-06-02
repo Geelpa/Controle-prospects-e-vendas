@@ -94,6 +94,11 @@ function getHiddenColumnsByDrilldownType(type) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda)
     }
 
+    if (type === "installationPaid" || type === "installationFree") {
+        hiddenColumns.push(COLUMN_MAP.status)
+        hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    }
+
     return hiddenColumns
 }
 
