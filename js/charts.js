@@ -1,9 +1,9 @@
 const CHART_COLORS = {
     blue: "#2563eb",
     cyan: "#0891b2",
-    emerald: "#059669",
-    amber: "#d97706",
-    rose: "#e11d48",
+    emerald: "#059646",
+    amber: "#c46f0f",
+    rose: "#f50808",
     violet: "#7c3aed",
     slate: "#475569",
     grid: "#e2e8f0",
