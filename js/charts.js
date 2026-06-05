@@ -1019,19 +1019,20 @@ function createInstallationChart(data) {
 
     wonOnly.forEach(item => {
 
-        const campaignId =
-            item[COLUMN_MAP.campanha]
+        const campaignId = item[COLUMN_MAP.campanha];
+        const campaignName = CAMPAIGN_MAP[campaignId];
 
-        const campaignName =
-            CAMPAIGN_MAP[campaignId] || ""
+        // 1. Otimização: Normalizamos o nome da campanha uma única vez fora do loop/condicional
+        const normalizedCampaignName = normalize(campaignName || "");
 
-        if (
-            normalize(campaignName)
-                .includes("isenta")
-        ) {
-            free++
+        // 2. Otimização: Mantemos os termos de busca em minúsculo para garantir a correspondência correta
+        const palavrasFree = ["isenta", "troca de titularidade"];
+
+        // 3. Verificação com tratamento para evitar erros caso campaignName seja nulo/indefinido
+        if (campaignName && palavrasFree.some(palavra => normalizedCampaignName.includes(palavra))) {
+            free++;
         } else {
-            paid++
+            paid++;
         }
     })
 
@@ -1050,14 +1051,17 @@ function createInstallationChart(data) {
             data: {
                 labels: [
                     "Taxa paga",
-                    "Taxa isenta"
+                    "Taxa isenta",
+                    "Outros"
                 ],
 
                 datasets: [{
                     data: [paid, free],
                     backgroundColor: [
                         CHART_COLORS.emerald,
-                        CHART_COLORS.amber
+                        CHART_COLORS.amber,
+                        CHART_COLORS.blue
+
                     ],
                     borderColor: "#ffffff",
                     borderWidth: 4,
