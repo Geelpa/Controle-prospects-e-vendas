@@ -9,13 +9,13 @@ const DRILLDOWN_TITLES = {
 }
 
 const LIST_COLUMN_CANDIDATES = [
-    "ID",
-    "Id",
-    "id",
-    "Código",
-    "Codigo",
-    "Cód.",
-    "Cod.",
+    // "ID",
+    // "Id",
+    // "id",
+    // "Código",
+    // "Codigo",
+    // "Cód.",
+    // "Cod.",
     "Razão",
     "Razao",
     "Razão social",
@@ -34,16 +34,16 @@ const LIST_COLUMN_CANDIDATES = [
     COLUMN_MAP.plano,
     COLUMN_MAP.canal,
     COLUMN_MAP.campanha,
-    COLUMN_MAP.data,
-    "Data do cadastro",
-    "Data de cadastro",
-    "Data cadastro",
-    "Data de ativação",
-    "Data de ativacao",
-    "Data ativação",
-    "Data ativacao",
-    "Ativação",
-    "Ativacao"
+    // COLUMN_MAP.data,
+    // "Data do cadastro",
+    // "Data de cadastro",
+    // "Data cadastro",
+    // "Data de ativação",
+    // "Data de ativacao",
+    // "Data ativação",
+    // "Data ativacao",
+    // "Ativação",
+    // "Ativacao"
 ]
 
 function openProspectList(type) {
@@ -84,22 +84,22 @@ function getHiddenColumnsByDrilldownType(type) {
         "noViability"
     ]
 
-    // const hiddenColumns = []
+    const hiddenColumns = []
 
-    // if (statusDrilldowns.includes(type)) {
-    //     hiddenColumns.push(COLUMN_MAP.status)
-    // }
+    if (statusDrilldowns.includes(type)) {
+        hiddenColumns.push(COLUMN_MAP.status)
+    }
 
-    // if (type === "inProgress" || type === "noViability") {
-    //     hiddenColumns.push(COLUMN_MAP.motivoPerda)
-    // }
+    if (type === "inProgress" || type === "noViability") {
+        hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    }
 
-    // if (type === "installationPaid" || type === "installationFree") {
-    //     hiddenColumns.push(COLUMN_MAP.status)
-    //     hiddenColumns.push(COLUMN_MAP.motivoPerda)
-    // }
+    if (type === "installationPaid" || type === "installationFree") {
+        hiddenColumns.push(COLUMN_MAP.status)
+        hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    }
 
-    // return hiddenColumns
+    return hiddenColumns
 }
 
 function closeProspectList() {
@@ -202,7 +202,7 @@ function renderProspectTable(rows, options = {}) {
     columns.forEach(column => {
         const cell = document.createElement("th")
 
-        cell.className = "px-4 py-3 text-left"
+        cell.className = "p-3 text-left text-slate-800 whitespace-normal"
         cell.textContent = getColumnLabel(column)
 
         header.appendChild(cell)
@@ -216,7 +216,7 @@ function renderProspectTable(rows, options = {}) {
         columns.forEach(column => {
             const cell = document.createElement("td")
 
-            cell.className = "px-4 py-3 text-slate-700 whitespace-nowrap"
+            cell.className = "p-3 text-slate-600 border border-slate-300"
             cell.textContent = formatListValue(column, row[column])
 
             line.appendChild(cell)
