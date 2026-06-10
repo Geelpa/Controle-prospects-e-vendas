@@ -1022,13 +1022,10 @@ function createInstallationChart(data) {
         const campaignId = item[COLUMN_MAP.campanha];
         const campaignName = CAMPAIGN_MAP[campaignId];
 
-        // 1. Otimização: Normalizamos o nome da campanha uma única vez fora do loop/condicional
         const normalizedCampaignName = normalize(campaignName || "");
 
-        // 2. Otimização: Mantemos os termos de busca em minúsculo para garantir a correspondência correta
         const palavrasFree = ["isenta", "troca"];
 
-        // 3. Verificação com tratamento para evitar erros caso campaignName seja nulo/indefinido
         if (campaignName && palavrasFree.some(palavra => normalizedCampaignName.includes(palavra))) {
             free++;
         } else {
