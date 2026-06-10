@@ -1052,7 +1052,6 @@ function createInstallationChart(data) {
                 labels: [
                     "Taxa paga",
                     "Taxa isenta",
-                    "Outros"
                 ],
 
                 datasets: [{
@@ -1060,8 +1059,6 @@ function createInstallationChart(data) {
                     backgroundColor: [
                         CHART_COLORS.emerald,
                         CHART_COLORS.amber,
-                        CHART_COLORS.blue
-
                     ],
                     borderColor: "#ffffff",
                     borderWidth: 4,
