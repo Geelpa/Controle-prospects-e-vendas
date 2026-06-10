@@ -166,28 +166,14 @@ function isWon(item) {
     )
 }
 
-// function isFreeInstallation(item) {
-//     const campaignId =
-//         item[COLUMN_MAP.campanha]
-
-//     const campaignName =
-//         CAMPAIGN_MAP[campaignId] || ""
-
-//     return normalize(campaignName)
-//         .includes("isenta")
-// }
-
 function isFreeInstallation(item) {
     const campaignId = item[COLUMN_MAP.campanha];
     const campaignName = CAMPAIGN_MAP[campaignId] || "";
 
-    // 1. Normaliza o nome da campanha uma única vez
     const normalizedCampaignName = normalize(campaignName);
 
-    // 2. Lista de termos em minúsculo
     const palavrasFree = ["isenta", "troca", "negociação", "não preenchido"];
 
-    // 3. Retorna true se encontrar alguma correspondência, ou false se não encontrar
     return palavrasFree.some(palavra => normalizedCampaignName.includes(palavra));
 }
 

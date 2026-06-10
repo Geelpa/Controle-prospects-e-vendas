@@ -1,6 +1,7 @@
 const CAMPAIGN_MAP = {
     "30": "TAXA PAGA - PRIMEIRA À R$50,00 (OU ISENTO)",
     "29": "Troca de titularidade",
+    "28": "TAXA ISENTA - 50% OFF NA PRIMEIRA MENSALIDADE",
     "27": "TAXA ISENTA - INDICAÇÃO",
     "26": "TAXA PAGA - R$50,00 OFF 3x",
     "25": "TAXA ISENTA - 3 COMPROVANTES DE PGTO",
