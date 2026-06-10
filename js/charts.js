@@ -1026,7 +1026,7 @@ function createInstallationChart(data) {
         const normalizedCampaignName = normalize(campaignName || "");
 
         // 2. Otimização: Mantemos os termos de busca em minúsculo para garantir a correspondência correta
-        const palavrasFree = ["isenta", "Troca de titularidade"];
+        const palavrasFree = ["isenta", "troca"];
 
         // 3. Verificação com tratamento para evitar erros caso campaignName seja nulo/indefinido
         if (campaignName && palavrasFree.some(palavra => normalizedCampaignName.includes(palavra))) {

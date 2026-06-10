@@ -84,22 +84,22 @@ function getHiddenColumnsByDrilldownType(type) {
         "noViability"
     ]
 
-    const hiddenColumns = []
+    // const hiddenColumns = []
 
-    if (statusDrilldowns.includes(type)) {
-        hiddenColumns.push(COLUMN_MAP.status)
-    }
+    // if (statusDrilldowns.includes(type)) {
+    //     hiddenColumns.push(COLUMN_MAP.status)
+    // }
 
-    if (type === "inProgress" || type === "noViability") {
-        hiddenColumns.push(COLUMN_MAP.motivoPerda)
-    }
+    // if (type === "inProgress" || type === "noViability") {
+    //     hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    // }
 
-    if (type === "installationPaid" || type === "installationFree") {
-        hiddenColumns.push(COLUMN_MAP.status)
-        hiddenColumns.push(COLUMN_MAP.motivoPerda)
-    }
+    // if (type === "installationPaid" || type === "installationFree") {
+    //     hiddenColumns.push(COLUMN_MAP.status)
+    //     hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    // }
 
-    return hiddenColumns
+    // return hiddenColumns
 }
 
 function closeProspectList() {
@@ -166,15 +166,29 @@ function isWon(item) {
     )
 }
 
+// function isFreeInstallation(item) {
+//     const campaignId =
+//         item[COLUMN_MAP.campanha]
+
+//     const campaignName =
+//         CAMPAIGN_MAP[campaignId] || ""
+
+//     return normalize(campaignName)
+//         .includes("isenta")
+// }
+
 function isFreeInstallation(item) {
-    const campaignId =
-        item[COLUMN_MAP.campanha]
+    const campaignId = item[COLUMN_MAP.campanha];
+    const campaignName = CAMPAIGN_MAP[campaignId] || "";
 
-    const campaignName =
-        CAMPAIGN_MAP[campaignId] || ""
+    // 1. Normaliza o nome da campanha uma única vez
+    const normalizedCampaignName = normalize(campaignName);
 
-    return normalize(campaignName)
-        .includes("isenta")
+    // 2. Lista de termos em minúsculo
+    const palavrasFree = ["isenta", "troca", "negociação", "não preenchido"];
+
+    // 3. Retorna true se encontrar alguma correspondência, ou false se não encontrar
+    return palavrasFree.some(palavra => normalizedCampaignName.includes(palavra));
 }
 
 function renderProspectTable(rows, options = {}) {
