@@ -202,7 +202,7 @@ function renderProspectTable(rows, options = {}) {
     columns.forEach(column => {
         const cell = document.createElement("th")
 
-        cell.className = "p-3 text-left text-slate-800 whitespace-normal"
+        cell.className = "p-4 text-left text-slate-800 whitespace-normal "
         cell.textContent = getColumnLabel(column)
 
         header.appendChild(cell)
@@ -216,7 +216,7 @@ function renderProspectTable(rows, options = {}) {
         columns.forEach(column => {
             const cell = document.createElement("td")
 
-            cell.className = "p-3 text-slate-600 border border-slate-300"
+            cell.className = "p-2 text-slate-600 border border-slate-300"
             cell.textContent = formatListValue(column, row[column])
 
             line.appendChild(cell)
