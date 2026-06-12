@@ -9,13 +9,13 @@ const DRILLDOWN_TITLES = {
 }
 
 const LIST_COLUMN_CANDIDATES = [
-    // "ID",
-    // "Id",
-    // "id",
-    // "Código",
-    // "Codigo",
-    // "Cód.",
-    // "Cod.",
+    "ID",
+    "Id",
+    "id",
+    "Código",
+    "Codigo",
+    "Cód.",
+    "Cod.",
     "Razão",
     "Razao",
     "Razão social",
