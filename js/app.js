@@ -101,57 +101,60 @@ function processData(data) {
 }
 
 function renderPodiums(currentData) {
-    const rankingGroups =
-        getPodiumRankingGroups(currentData)
+    const rankingGroups = getPodiumRankingGroups(currentData);
 
-    const bestItems =
-        rankingGroups
-            .map(group => {
-                const first = group.entries[0]
+    const bestItems = rankingGroups.map(group => {
+        const first = group.entries[0];
 
-                if (!first) return null
+        if (!first) return null;
 
-                return {
-                    title: group.title,
-                    label: first[0],
-                    value: first[1],
-                    unit: group.unit
-                }
-            })
-            .filter(Boolean)
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 3)
+        return {
+            title: group.title,
+            label: first[0],
+            value: first[1],
+            unit: group.unit
+        };
+    }).filter(Boolean);
+    // OBS: O .sort() foi removido daqui para não embaralhar as categorias!
 
-    renderPodiumList("bestPodiumList", bestItems)
+    renderPodiumList("bestPodiumList", bestItems);
 }
 
 function getPodiumRankingGroups(currentData) {
-    // 1. Filtros normais (mês, ano e vendedor)
+    // Pega apenas as vendas ganhas para contar o volume de sucesso
     const wonOnlyNormal = currentData.filter(item =>
         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
     );
 
-    // 2. Filtros para o pódio de Vendedores (mês e ano)
     const wonOnlySellers = currentData.filter(item =>
         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
     );
 
-    // O JavaScript vai renderizar rigidamente nesta sequência:
+    // Função de segurança para garantir que exiba "Leandro" e não "74"
+    const formatName = (mapName, key) => {
+        if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
+        return key;
+    };
+
+    // A ordem aqui dita as colunas: 1º Vendedor (Esq) -> 2º Canal (Meio) -> 3º Campanha (Dir)
     return [
         {
             title: "Vendedor",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
+                .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Canal de Venda",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
+                .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Campanha",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
+                .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
         }
     ];
 }
@@ -164,12 +167,12 @@ function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
         const value = item[columnKey];
         if (!value || normalize(value) === "undefined") return;
 
-        // Conta oportunidades válidas (Ganhou ou Perdeu)
+        // Conta oportunidades válidas (Ganhou ou Perdeu) para saber o total trabalhado
         if (isWorkableSaleStatus(item)) {
             totalByGroup[value] = (totalByGroup[value] || 0) + 1;
         }
 
-        // Conta conversões puras
+        // Conta conversões puras (Apenas Ganhos)
         const isWon = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
         if (isWon) {
             winsByGroup[value] = (winsByGroup[value] || 0) + 1;
@@ -182,15 +185,23 @@ function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
         const total = totalByGroup[key] || 0;
         const wins = winsByGroup[key] || 0;
 
+        // Regra de segurança: precisa ter o mínimo de vendas exigido
         if (wins >= minWinsRequired && total > 0) {
             const rate = ((wins / total) * 100).toFixed(1);
-            efficiencyEntries.push([key, parseFloat(rate)]);
+            // Guarda [Nome, Taxa(%), TotalDeVendas]
+            efficiencyEntries.push([key, parseFloat(rate), wins]);
         }
     });
 
-    // CORREÇÃO: Descomentado para ordenar o ranking interno de cada uma das colunas separadamente!
-    return efficiencyEntries
-    // .sort((a, b) => b[1] - a[1]);
+    // Ordenação Inteligente: 
+    // 1º Quem tem maior % de conversão.
+    // 2º Se a % for igual, ganha quem fez mais vendas brutas.
+    return efficiencyEntries.sort((a, b) => {
+        if (b[1] === a[1]) {
+            return b[2] - a[2]; // Desempate por volume
+        }
+        return b[1] - a[1]; // Ordenação principal por conversão
+    });
 }
 
 function renderPodiumList(containerId, items) {
