@@ -34,16 +34,16 @@ const LIST_COLUMN_CANDIDATES = [
     COLUMN_MAP.plano,
     COLUMN_MAP.canal,
     COLUMN_MAP.campanha,
-    // COLUMN_MAP.data,
-    // "Data do cadastro",
-    // "Data de cadastro",
-    // "Data cadastro",
-    // "Data de ativação",
-    // "Data de ativacao",
-    // "Data ativação",
-    // "Data ativacao",
-    // "Ativação",
-    // "Ativacao"
+    COLUMN_MAP.data,
+    "Data do cadastro",
+    "Data de cadastro",
+    "Data cadastro",
+    "Data de ativação",
+    "Data de ativacao",
+    "Data ativação",
+    "Data ativacao",
+    "Ativação",
+    "Ativacao"
 ]
 
 function openProspectList(type) {
