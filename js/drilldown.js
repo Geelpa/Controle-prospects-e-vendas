@@ -77,36 +77,35 @@ function openProspectListForRows(modalTitle, rows, options = {}) {
 }
 
 function getHiddenColumnsByDrilldownType(type) {
-    const statusDrilldowns = [
-        "inProgress",
-        "won",
-        "lost",
-        "noViability"
-    ]
-
     const hiddenColumns = []
 
-    // 1. Sempre esconde a coluna de Status nos modais de status específico
-    if (statusDrilldowns.includes(type)) {
+    // Normaliza o tipo para facilitar a busca de palavras-chave
+    const lowerType = String(type || "").toLowerCase()
+
+    // 1. Descobre o contexto baseado no título/tipo do modal
+    const isWonContext = lowerType.includes("won") || lowerType.includes("venc") || lowerType.includes("ganh")
+    const isLostContext = lowerType.includes("lost") || lowerType.includes("perd")
+    const isNoViabilityContext = lowerType.includes("viabil")
+    const isInProgressContext = lowerType.includes("progress") || lowerType.includes("andamento")
+    const isInstallation = lowerType.includes("installation") || lowerType.includes("taxa")
+
+    // 2. REGRA PARA O STATUS: Se for qualquer modal específico de um grupo, esconde a coluna Status
+    if (isWonContext || isLostContext || isNoViabilityContext || isInProgressContext || isInstallation) {
         hiddenColumns.push(COLUMN_MAP.status)
+        hiddenColumns.push("Status") // Segurança extra por texto
     }
 
-    // 2. CORREÇÃO/MELHORIA: Se NÃO for uma venda vencida (won), esconde o Plano de Venda
-    // Isso remove o plano de "inProgress", "lost" e "noViability"
-    if (type !== "won" && type !== "installationPaid" && type !== "installationFree") {
+    // 3. REGRA PARA O PLANO: Se NÃO for um contexto de sucesso, esconde o Plano de Venda
+    if (!isWonContext && !isInstallation) {
         hiddenColumns.push(COLUMN_MAP.plano)
+        hiddenColumns.push("Plano")
     }
 
-    // 3. Esconde o Motivo de Perda em andamento, sem viabilidade e nos de instalação (vencidos)
-    // ADICIONADO: "won" também entra aqui, pois se venceu, não faz sentido ver o motivo da perda
-    if (
-        type === "inProgress" ||
-        type === "noViability" ||
-        type === "won" ||
-        type === "installationPaid" ||
-        type === "installationFree"
-    ) {
+    // 4. REGRA PARA O MOTIVO: Se for sucesso, andamento ou taxas, esconde o Motivo de Perda
+    if (isWonContext || isInProgressContext || isNoViabilityContext || isInstallation) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda)
+        hiddenColumns.push("Motivo") // Como vimos na imagem, a coluna se chama exatamente "MOTIVO"
+        hiddenColumns.push("Motivo de Perda")
     }
 
     return hiddenColumns
@@ -199,36 +198,40 @@ function renderProspectTable(rows, options = {}) {
 
     empty.classList.toggle("hidden", rows.length > 0)
 
-    const hiddenColumns =
-        options.hiddenColumns || []
+    const hiddenColumns = options.hiddenColumns || []
 
+    // FILTRO CORRIGIDO: Checa tanto a chave original quanto o label que vai para a tela
     const columns = getListColumns(rows)
-        .filter(column =>
-            !hiddenColumns.some(hiddenColumn =>
-                normalize(hiddenColumn) === normalize(column)
-            )
-        )
+        .filter(column => {
+            const originalKey = column;
+            const visualLabel = getColumnLabel(column);
 
+            // Se o que deve ser escondido bater com a chave original OU com o label visual, a coluna é removida
+            const shouldHide = hiddenColumns.some(hiddenColumn =>
+                normalize(hiddenColumn) === normalize(originalKey) ||
+                normalize(hiddenColumn) === normalize(visualLabel)
+            );
+
+            return !shouldHide;
+        })
+
+    // Renderiza os cabeçalhos das colunas que restaram
     columns.forEach(column => {
         const cell = document.createElement("th")
-
         cell.className = "p-4 text-left text-slate-800 whitespace-normal "
         cell.textContent = getColumnLabel(column)
-
         header.appendChild(cell)
     })
 
+    // Renderiza as linhas
     rows.forEach(row => {
         const line = document.createElement("tr")
-
         line.className = "hover:bg-slate-50"
 
         columns.forEach(column => {
             const cell = document.createElement("td")
-
             cell.className = "p-2 text-slate-600 border border-slate-300"
             cell.textContent = formatListValue(column, row[column])
-
             line.appendChild(cell)
         })
 
