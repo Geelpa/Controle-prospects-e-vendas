@@ -72,10 +72,6 @@ function processData(data) {
         }
 
         totalRevenue += price
-
-        // if (plan) {
-        //     totalRevenue += plan.price
-        // }
     })
 
     const averageTicket =
@@ -139,16 +135,19 @@ function renderPodiums(data) {
 }
 
 function getPodiumRankingGroups(data) {
+    // 1. Filtra apenas os itens que possuem status de "ganho/vencido"
     const wonOnly = data.filter(item =>
         STATUS.won.includes(
             normalize(item[COLUMN_MAP.status])
         )
     )
 
+    // 2. Filtra os ganhos que possuem um plano válido preenchido
     const wonWithPlan = wonOnly.filter(item =>
         String(item[COLUMN_MAP.plano] || "").trim() !== ""
     )
 
+    // 3. Mantém os perdidos apenas para o pódio de "Motivos de Perda"
     const lostOnly = data.filter(item =>
         STATUS.lost.includes(
             normalize(item[COLUMN_MAP.status])
@@ -156,31 +155,36 @@ function getPodiumRankingGroups(data) {
     )
 
     return [
+        // {
+        //     title: "Planos",
+        //     unit: "vendas",
+        //     // Já usava os ganhos
+        //     entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
+        // },
         {
-            title: "Planos",
+            title: "Vendedor",
             unit: "vendas",
-            entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
-        },
-        {
-            title: "Vendedores",
-            unit: "vendas",
+            // Já usava os ganhos
             entries: getRankingEntries(groupBy(wonOnly, COLUMN_MAP.vendedor), 8)
         },
         {
-            title: "Canais",
-            unit: "leads",
-            entries: getRankingEntries(groupBy(data, COLUMN_MAP.canal), 8)
+            title: "Canal",
+            unit: "vendas", // Mudou de "leads" para "vendas"
+            // CORREÇÃO: Mudou de 'data' para 'wonOnly'
+            entries: getRankingEntries(groupBy(wonOnly, COLUMN_MAP.canal), 8)
         },
         {
-            title: "Campanhas",
-            unit: "leads",
-            entries: getRankingEntries(groupBy(data, COLUMN_MAP.campanha), 8)
+            title: "Campanha    ",
+            unit: "vendas", // Mudou de "leads" para "vendas"
+            // CORREÇÃO: Mudou de 'data' para 'wonOnly'
+            entries: getRankingEntries(groupBy(wonOnly, COLUMN_MAP.campanha), 8)
         },
-        {
-            title: "Motivos de Perda",
-            unit: "perdas",
-            entries: getRankingEntries(groupBy(lostOnly, COLUMN_MAP.motivoPerda), 8)
-        }
+        // {
+        //     title: "Motivos de Perda",
+        //     unit: "perdas",
+        //     // Mantém os perdidos aqui, já que o objetivo é ver o motivo do fracasso
+        //     entries: getRankingEntries(groupBy(lostOnly, COLUMN_MAP.motivoPerda), 8)
+        // }
     ]
 }
 

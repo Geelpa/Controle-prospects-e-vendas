@@ -86,16 +86,26 @@ function getHiddenColumnsByDrilldownType(type) {
 
     const hiddenColumns = []
 
+    // 1. Sempre esconde a coluna de Status nos modais de status específico
     if (statusDrilldowns.includes(type)) {
         hiddenColumns.push(COLUMN_MAP.status)
     }
 
-    if (type === "inProgress" || type === "noViability") {
-        hiddenColumns.push(COLUMN_MAP.motivoPerda)
+    // 2. CORREÇÃO/MELHORIA: Se NÃO for uma venda vencida (won), esconde o Plano de Venda
+    // Isso remove o plano de "inProgress", "lost" e "noViability"
+    if (type !== "won" && type !== "installationPaid" && type !== "installationFree") {
+        hiddenColumns.push(COLUMN_MAP.plano)
     }
 
-    if (type === "installationPaid" || type === "installationFree") {
-        hiddenColumns.push(COLUMN_MAP.status)
+    // 3. Esconde o Motivo de Perda em andamento, sem viabilidade e nos de instalação (vencidos)
+    // ADICIONADO: "won" também entra aqui, pois se venceu, não faz sentido ver o motivo da perda
+    if (
+        type === "inProgress" ||
+        type === "noViability" ||
+        type === "won" ||
+        type === "installationPaid" ||
+        type === "installationFree"
+    ) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda)
     }
 
