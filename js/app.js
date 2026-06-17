@@ -1,5 +1,5 @@
 function processData(data) {
-    currentFilteredData = data
+    currentFilteredData = data;
 
     const total = data.length
 
@@ -33,20 +33,12 @@ function processData(data) {
     let totalRevenue = 0
 
     wonOnly.forEach(item => {
-
-        const planId =
-            item[COLUMN_MAP.plano]
-
+        const planId = item[COLUMN_MAP.plano]
         let price = 0
 
-        // SE VIER ID
         if (PLAN_MAP[planId]) {
-
             price = PLAN_MAP[planId].price
-
         } else {
-
-            // SE VIER NOME
             const foundPlan =
                 Object.values(PLAN_MAP).find(plan =>
                     normalize(plan.name) ===
@@ -57,7 +49,6 @@ function processData(data) {
                 price = foundPlan.price
             }
         }
-
         totalRevenue += price
     })
 
@@ -73,7 +64,6 @@ function processData(data) {
         noViability,
         inProgress,
         conversion,
-
         averageTicket:
             averageTicket.toLocaleString(
                 "pt-BR",
@@ -84,8 +74,10 @@ function processData(data) {
             )
     })
 
+    // CRUCIAL: Passamos os dados atuais (filtrados por mês/ano/etc) para o pódio controlar internamente
     renderPodiums(data)
 
+    // Gráficos continuam normais
     createChannelsChart(data)
     createCampaignsChart(data)
     createLossReasonsChart(data)
@@ -96,23 +88,20 @@ function processData(data) {
 }
 
 function renderPodiums(currentData) {
-    const rankingGroups =
-        getPodiumRankingGroups(currentData)
+    const rankingGroups = getPodiumRankingGroups(currentData);
 
-    const bestItems =
-        rankingGroups
-            .map(group => {
-                const first = group.entries[0]
+    const bestItems = rankingGroups.map(group => {
+        const first = group.entries[0];
 
-                if (!first) return null
+        if (!first) return null;
 
-                return {
-                    title: group.title,
-                    label: first[0],
-                    value: first[1],
-                    unit: group.unit
-                };
-            }).filter(Boolean);
+        return {
+            title: group.title,
+            label: first[0],
+            value: first[1],
+            unit: group.unit
+        };
+    }).filter(Boolean);
     // OBS: O .sort() foi removido daqui para não embaralhar as categorias!
 
     renderPodiumList("bestPodiumList", bestItems);
@@ -158,38 +147,33 @@ function renderPodiums(currentData) {
 // }
 
 function getPodiumRankingGroups(currentData) {
-    // 1. Filtros normais (mês, ano e vendedor)
-    const wonOnlyNormal = currentData.filter(item =>
-        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-    );
+    // ALTERADO: Filtra os dados de forma limpa usando a inteligência do isWon
+    const wonOnlyNormal = currentData.filter(isWon);
+    const wonOnlySellers = currentData.filter(isWon);
 
-    // 2. Filtros para o pódio de Vendedores (mês e ano)
-    const wonOnlySellers = currentData.filter(item =>
-        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-    );
+    const formatName = (mapName, key) => {
+        if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
+        return key;
+    };
 
-    // O JavaScript vai renderizar rigidamente nesta sequência:
     return [
-        // {
-        //     title: "Planos",
-        //     unit: "vendas",
-        //     // Já usava os ganhos
-        //     entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
-        // },
         {
             title: "Vendedor",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
+                .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Canal de Venda",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
+                .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Campanha",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
+                .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
         }
     ];
 }
@@ -202,12 +186,12 @@ function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
         const value = item[columnKey];
         if (!value || normalize(value) === "undefined") return;
 
-        // Conta oportunidades válidas (Ganhou ou Perdeu)
+        // Conta oportunidades válidas (Ganhou ou Perdeu) para saber o total trabalhado
         if (isWorkableSaleStatus(item)) {
             totalByGroup[value] = (totalByGroup[value] || 0) + 1;
         }
 
-        // Conta conversões puras
+        // Conta conversões puras (Apenas Ganhos)
         const isWon = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
         if (isWon) {
             winsByGroup[value] = (winsByGroup[value] || 0) + 1;
@@ -220,15 +204,23 @@ function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
         const total = totalByGroup[key] || 0;
         const wins = winsByGroup[key] || 0;
 
+        // Regra de segurança: precisa ter o mínimo de vendas exigido
         if (wins >= minWinsRequired && total > 0) {
             const rate = ((wins / total) * 100).toFixed(1);
-            efficiencyEntries.push([key, parseFloat(rate)]);
+            // Guarda [Nome, Taxa(%), TotalDeVendas]
+            efficiencyEntries.push([key, parseFloat(rate), wins]);
         }
     });
 
-    // CORREÇÃO: Descomentado para ordenar o ranking interno de cada uma das colunas separadamente!
-    return efficiencyEntries
-    // .sort((a, b) => b[1] - a[1]);
+    // Ordenação Inteligente: 
+    // 1º Quem tem maior % de conversão.
+    // 2º Se a % for igual, ganha quem fez mais vendas brutas.
+    return efficiencyEntries.sort((a, b) => {
+        if (b[1] === a[1]) {
+            return b[2] - a[2]; // Desempate por volume
+        }
+        return b[1] - a[1]; // Ordenação principal por conversão
+    });
 }
 
 function renderPodiumList(containerId, items) {
@@ -401,15 +393,24 @@ function getRowsByDrilldownType(type) {
 }
 
 function isWon(item) {
-    return STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+    const hasWonStatus = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+
+    const contractStatus = item[COLUMN_MAP.contrato];
+    const isContractActive = contractStatus && normalize(contractStatus) === normalize("ativo");
+
+    const planSelected = item[COLUMN_MAP.plano];
+    const hasPlan = planSelected &&
+        normalize(planSelected) !== "" &&
+        normalize(planSelected) !== "undefined" &&
+        normalize(planSelected) !== "null";
+
+    return hasWonStatus && isContractActive && hasPlan;
 }
 
-function isWorkableSaleStatus(item) {
-    const status =
-        normalize(item[COLUMN_MAP.status])
 
-    return STATUS.won.includes(status) ||
-        STATUS.lost.includes(status)
+function isWorkableSaleStatus(item) {
+    const status = normalize(item[COLUMN_MAP.status]);
+    return STATUS.won.includes(status) || STATUS.lost.includes(status);
 }
 
 function getRankingEntries(grouped, limit) {
@@ -419,7 +420,6 @@ function getRankingEntries(grouped, limit) {
             normalize(label) !== "undefined" &&
             Number(value) > 0
         )
-        // .sort((a, b) => b[1] - a[1])
         .slice(0, limit)
 }
 
@@ -460,6 +460,20 @@ function formatListValue(column, value) {
     if (column === COLUMN_MAP.canal) return CHANNEL_MAP[value] || value || "-";
     if (column === COLUMN_MAP.campanha) return CAMPAIGN_MAP[value] || value || "-";
     return value || "-";
+}
+
+function copyPhoneToClipboard(phone) {
+    if (!phone) return;
+
+    // Copia para o clipboard
+    navigator.clipboard.writeText(phone).then(() => {
+        alert("Telefone copiado: " + phone);
+
+        // Abre o WhatsApp Web automaticamente (formato internacional padrão)
+        // Remove caracteres não numéricos
+        const cleanPhone = phone.replace(/\D/g, '');
+        window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+    });
 }
 
 /* 4. EVENT LISTENERS DO SISTEMA */
