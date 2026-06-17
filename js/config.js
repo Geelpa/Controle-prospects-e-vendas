@@ -10,7 +10,7 @@ const COLUMN_MAP = {
     status: "Status",
     motivoPerda: "Descrição",
     data: "Data do cadastro",
-    contrato: "Status contrato",
+    // contrato: "Status contrato",
     telefone: "Telefone"
 }
 
