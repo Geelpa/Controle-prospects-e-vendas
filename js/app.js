@@ -3,31 +3,21 @@ function processData(data) {
 
     const total = data.length
 
-    const won = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    ).length
+    // ALTERADO: Agora usa a nossa nova função isWon com critérios rígidos
+    const won = data.filter(isWon).length;
 
     const lost = data.filter(item =>
-        STATUS.lost.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
+        STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
     ).length
 
     const noViability = data.filter(item =>
-        STATUS.noViability.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
+        STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
     ).length
 
     const inProgress = data.filter(item =>
-        STATUS.inProgress.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
+        STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
     ).length
 
-    // CONVERSÃO REAL
     const workableSales = data.filter(item =>
         isWorkableSaleStatus(item)
     ).length
@@ -37,11 +27,8 @@ function processData(data) {
             ? ((won / workableSales) * 100).toFixed(1)
             : 0
 
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    // ALTERADO: Pega os dados brutos filtrando apenas vendas reais confirmadas
+    const wonOnly = data.filter(isWon);
 
     let totalRevenue = 0
 
@@ -120,23 +107,55 @@ function renderPodiums(currentData) {
     renderPodiumList("bestPodiumList", bestItems);
 }
 
+// function getPodiumRankingGroups(currentData) {
+//     // Pega apenas as vendas ganhas para contar o volume de sucesso
+//     const wonOnlyNormal = currentData.filter(item =>
+//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+//     );
+
+//     const wonOnlySellers = currentData.filter(item =>
+//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+//     );
+
+//     // Função de segurança para garantir que exiba "Leandro" e não "74"
+//     const formatName = (mapName, key) => {
+//         if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
+//         return key;
+//     };
+
+//     // A ordem aqui dita as colunas: 1º Vendedor (Esq) -> 2º Canal (Meio) -> 3º Campanha (Dir)
+//     return [
+//         {
+//             title: "Vendedor",
+//             unit: "vendas",
+//             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
+//                 .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
+//         },
+//         {
+//             title: "Canal de Venda",
+//             unit: "vendas",
+//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
+//                 .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
+//         },
+//         {
+//             title: "Campanha",
+//             unit: "vendas",
+//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
+//                 .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
+//         }
+//     ];
+// }
+
 function getPodiumRankingGroups(currentData) {
-    // Pega apenas as vendas ganhas para contar o volume de sucesso
-    const wonOnlyNormal = currentData.filter(item =>
-        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-    );
+    // ALTERADO: Filtra os dados de forma limpa usando a inteligência do isWon
+    const wonOnlyNormal = currentData.filter(isWon);
+    const wonOnlySellers = currentData.filter(isWon);
 
-    const wonOnlySellers = currentData.filter(item =>
-        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-    );
-
-    // Função de segurança para garantir que exiba "Leandro" e não "74"
     const formatName = (mapName, key) => {
         if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
         return key;
     };
 
-    // A ordem aqui dita as colunas: 1º Vendedor (Esq) -> 2º Canal (Meio) -> 3º Campanha (Dir)
     return [
         {
             title: "Vendedor",
@@ -374,8 +393,20 @@ function getRowsByDrilldownType(type) {
 }
 
 function isWon(item) {
-    return STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+    const hasWonStatus = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+
+    const contractStatus = item[COLUMN_MAP.contrato];
+    const isContractActive = contractStatus && normalize(contractStatus) === normalize("ativo");
+
+    const planSelected = item[COLUMN_MAP.plano];
+    const hasPlan = planSelected &&
+        normalize(planSelected) !== "" &&
+        normalize(planSelected) !== "undefined" &&
+        normalize(planSelected) !== "null";
+
+    return hasWonStatus && isContractActive && hasPlan;
 }
+
 
 function isWorkableSaleStatus(item) {
     const status = normalize(item[COLUMN_MAP.status]);
@@ -389,7 +420,6 @@ function getRankingEntries(grouped, limit) {
             normalize(label) !== "undefined" &&
             Number(value) > 0
         )
-        // .sort((a, b) => b[1] - a[1])
         .slice(0, limit)
 }
 
@@ -430,6 +460,20 @@ function formatListValue(column, value) {
     if (column === COLUMN_MAP.canal) return CHANNEL_MAP[value] || value || "-";
     if (column === COLUMN_MAP.campanha) return CAMPAIGN_MAP[value] || value || "-";
     return value || "-";
+}
+
+function copyPhoneToClipboard(phone) {
+    if (!phone) return;
+
+    // Copia para o clipboard
+    navigator.clipboard.writeText(phone).then(() => {
+        alert("Telefone copiado: " + phone);
+
+        // Abre o WhatsApp Web automaticamente (formato internacional padrão)
+        // Remove caracteres não numéricos
+        const cleanPhone = phone.replace(/\D/g, '');
+        window.open(`https://wa.me/55${cleanPhone}`, '_blank');
+    });
 }
 
 /* 4. EVENT LISTENERS DO SISTEMA */

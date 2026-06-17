@@ -29,6 +29,8 @@ const LIST_COLUMN_CANDIDATES = [
     "Telefone",
     "Celular",
     COLUMN_MAP.status,
+    COLUMN_MAP.status,
+    COLUMN_MAP.contrato,
     COLUMN_MAP.motivoPerda,
     COLUMN_MAP.vendedor,
     COLUMN_MAP.plano,
@@ -172,6 +174,7 @@ function isWon(item) {
         normalize(item[COLUMN_MAP.status])
     )
 }
+
 
 function isFreeInstallation(item) {
     const campaignId = item[COLUMN_MAP.campanha];

@@ -9,7 +9,9 @@ const COLUMN_MAP = {
     plano: "Plano de venda",
     status: "Status",
     motivoPerda: "Descrição",
-    data: "Data do cadastro"
+    data: "Data do cadastro",
+    contrato: "Status contrato",
+    telefone: "Telefone"
 }
 
 const STATUS = {
