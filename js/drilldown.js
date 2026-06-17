@@ -250,18 +250,31 @@ function renderProspectTable(rows, options = {}) {
 
     // 5. Desenha as linhas da tabela
     rows.forEach(row => {
-        const line = document.createElement("tr")
-        line.className = "hover:bg-slate-50"
+        const line = document.createElement("tr");
+        line.className = "hover:bg-slate-50";
 
         columns.forEach(column => {
-            const cell = document.createElement("td")
-            cell.className = "p-2 text-slate-600 border border-slate-300"
-            cell.textContent = formatListValue(column, row[column])
-            line.appendChild(cell)
-        })
+            const cell = document.createElement("td");
+            cell.className = "p-2 text-slate-600 border border-slate-300";
 
-        body.appendChild(line)
-    })
+            // --- NOVA LÓGICA AQUI ---
+            // Verifica se a coluna atual é a de "Motivo de Perda"
+            const isMotivoColumn = normalize(column) === normalize(COLUMN_MAP.motivoPerda) ||
+                normalize(column) === normalize("Motivo");
+
+            // Se for a coluna de motivo E for uma venda real (isWon), exibe vazio.
+            if (isMotivoColumn && isWon(row)) {
+                cell.textContent = "-";
+            } else {
+                cell.textContent = formatListValue(column, row[column]);
+            }
+            // -------------------------
+
+            line.appendChild(cell);
+        });
+
+        body.appendChild(line);
+    });
 }
 
 function getListColumns(rows) {

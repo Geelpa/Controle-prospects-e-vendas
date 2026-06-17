@@ -1,6 +1,6 @@
 const CAMPAIGN_MAP = {
     "31": "PAGA - 50% OFF 2X",
-    "30": "PAGA - PRIMEIRA À R$50,00 (OU ISENTO)",
+    "30": "PAGA - 1ª R$50,00 (OU ISENTO)",
     "29": "Troca de titularidade",
     "28": "ISENTA - 50% OFF NA PRIMEIRA MENSALIDADE",
     "27": "ISENTA - INDICAÇÃO",
