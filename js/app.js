@@ -113,49 +113,9 @@ function renderPodiums(currentData) {
                     unit: group.unit
                 };
             }).filter(Boolean);
-    // OBS: O .sort() foi removido daqui para não embaralhar as categorias!
 
     renderPodiumList("bestPodiumList", bestItems);
 }
-
-// function getPodiumRankingGroups(currentData) {
-//     // Pega apenas as vendas ganhas para contar o volume de sucesso
-//     const wonOnlyNormal = currentData.filter(item =>
-//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-//     );
-
-//     const wonOnlySellers = currentData.filter(item =>
-//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-//     );
-
-//     // Função de segurança para garantir que exiba "Leandro" e não "74"
-//     const formatName = (mapName, key) => {
-//         if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
-//         return key;
-//     };
-
-//     // A ordem aqui dita as colunas: 1º Vendedor (Esq) -> 2º Canal (Meio) -> 3º Campanha (Dir)
-//     return [
-//         {
-//             title: "Vendedor",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
-//                 .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
-//         },
-//         {
-//             title: "Canal de Venda",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
-//                 .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
-//         },
-//         {
-//             title: "Campanha",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
-//                 .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
-//         }
-//     ];
-// }
 
 function getPodiumRankingGroups(currentData) {
     // 1. Filtros normais (mês, ano e vendedor)
@@ -170,12 +130,6 @@ function getPodiumRankingGroups(currentData) {
 
     // O JavaScript vai renderizar rigidamente nesta sequência:
     return [
-        // {
-        //     title: "Planos",
-        //     unit: "vendas",
-        //     // Já usava os ganhos
-        //     entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
-        // },
         {
             title: "Vendedor",
             unit: "vendas",
@@ -194,103 +148,103 @@ function getPodiumRankingGroups(currentData) {
     ];
 }
 
-function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
-    const totalByGroup = {};
-    const winsByGroup = {};
+// function getEfficiencyRanking(globalData, columnKey, minWinsRequired = 5) {
+//     const totalByGroup = {};
+//     const winsByGroup = {};
 
-    globalData.forEach(item => {
-        const value = item[columnKey];
-        if (!value || normalize(value) === "undefined") return;
+//     globalData.forEach(item => {
+//         const value = item[columnKey];
+//         if (!value || normalize(value) === "undefined") return;
 
-        // Conta oportunidades válidas (Ganhou ou Perdeu)
-        if (isWorkableSaleStatus(item)) {
-            totalByGroup[value] = (totalByGroup[value] || 0) + 1;
-        }
+//         // Conta oportunidades válidas (Ganhou ou Perdeu)
+//         if (isWorkableSaleStatus(item)) {
+//             totalByGroup[value] = (totalByGroup[value] || 0) + 1;
+//         }
 
-        // Conta conversões puras
-        const isWon = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
-        if (isWon) {
-            winsByGroup[value] = (winsByGroup[value] || 0) + 1;
-        }
-    });
+//         // Conta conversões puras
+//         const isWon = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+//         if (isWon) {
+//             winsByGroup[value] = (winsByGroup[value] || 0) + 1;
+//         }
+//     });
 
-    const efficiencyEntries = [];
+//     const efficiencyEntries = [];
 
-    Object.keys(totalByGroup).forEach(key => {
-        const total = totalByGroup[key] || 0;
-        const wins = winsByGroup[key] || 0;
+//     Object.keys(totalByGroup).forEach(key => {
+//         const total = totalByGroup[key] || 0;
+//         const wins = winsByGroup[key] || 0;
 
-        if (wins >= minWinsRequired && total > 0) {
-            const rate = ((wins / total) * 100).toFixed(1);
-            efficiencyEntries.push([key, parseFloat(rate)]);
-        }
-    });
+//         if (wins >= minWinsRequired && total > 0) {
+//             const rate = ((wins / total) * 100).toFixed(1);
+//             efficiencyEntries.push([key, parseFloat(rate)]);
+//         }
+//     });
 
-    // CORREÇÃO: Descomentado para ordenar o ranking interno de cada uma das colunas separadamente!
-    return efficiencyEntries
-    // .sort((a, b) => b[1] - a[1]);
-}
+//     // CORREÇÃO: Descomentado para ordenar o ranking interno de cada uma das colunas separadamente!
+//     return efficiencyEntries
+//     // .sort((a, b) => b[1] - a[1]);
+// }
 
-function renderPodiumList(containerId, items) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
+// function renderPodiumList(containerId, items) {
+//     const container = document.getElementById(containerId);
+//     if (!container) return;
 
-    // 1. Estiliza o fundo do painel do pódio para o modo escuro premium
-    const podiumWrapper = container.closest('.bg-green-500') || container;
-    if (podiumWrapper) {
-        podiumWrapper.className = "bg-slate-900 rounded-xl p-4 shadow-xl border border-green-800 transition-all duration-300";
-    }
+//     // 1. Estiliza o fundo do painel do pódio para o modo escuro premium
+//     const podiumWrapper = container.closest('.bg-green-500') || container;
+//     if (podiumWrapper) {
+//         podiumWrapper.className = "bg-slate-900 rounded-xl p-4 shadow-xl border border-green-800 transition-all duration-300";
+//     }
 
-    // 2. FORÇA O CONTAINER A SER FLEX ROW (Cards lado a lado)
-    // Adicionado 'flex flex-row flex-wrap md:flex-nowrap gap-4' para alinhar em linha e ficar responsivo
-    container.className = "flex flex-row flex-wrap md:flex-nowrap gap-4 w-full justify-between items-center";
+//     // 2. FORÇA O CONTAINER A SER FLEX ROW (Cards lado a lado)
+//     // Adicionado 'flex flex-row flex-wrap md:flex-nowrap gap-4' para alinhar em linha e ficar responsivo
+//     container.className = "flex flex-row flex-wrap md:flex-nowrap gap-4 w-full justify-between items-center";
 
-    container.innerHTML = "";
+//     container.innerHTML = "";
 
-    if (!items.length) {
-        const empty = document.createElement("p");
-        empty.className = "text-xs text-slate-400 italic p-2 w-full text-center";
-        empty.textContent = "Sem dados suficientes para este período.";
-        container.appendChild(empty);
-        return;
-    }
+//     if (!items.length) {
+//         const empty = document.createElement("p");
+//         empty.className = "text-xs text-slate-400 italic p-2 w-full text-center";
+//         empty.textContent = "Sem dados suficientes para este período.";
+//         container.appendChild(empty);
+//         return;
+//     }
 
-    // 3. Renderiza os cartões dentro do fluxo flex-row
-    items.forEach((item) => {
-        const card = document.createElement("div");
-        const rank = document.createElement("div");
-        const content = document.createElement("div");
-        const title = document.createElement("p");
-        const label = document.createElement("p");
-        const value = document.createElement("p");
+//     // 3. Renderiza os cartões dentro do fluxo flex-row
+//     items.forEach((item) => {
+//         const card = document.createElement("div");
+//         const rank = document.createElement("div");
+//         const content = document.createElement("div");
+//         const title = document.createElement("p");
+//         const label = document.createElement("p");
+//         const value = document.createElement("p");
 
-        // Layout do Card - Adicionado 'flex-1' para que os 3 dividam o espaço da linha igualmente
-        card.className = "bg-slate-800/50 backdrop-blur-sm border border-green-700/50 rounded-lg p-3 flex flex-row gap-3 items-center min-w-[200px] flex-1 shadow-sm transition-all duration-200 hover:border-green-600 hover:bg-green-950";
+//         // Layout do Card - Adicionado 'flex-1' para que os 3 dividam o espaço da linha igualmente
+//         card.className = "bg-slate-800/50 backdrop-blur-sm border border-green-700/50 rounded-lg p-3 flex flex-row gap-3 items-center min-w-[200px] flex-1 shadow-sm transition-all duration-200 hover:border-green-600 hover:bg-green-950";
 
-        // Badge do 1º Lugar - Medalha Dourada
-        rank.className = "shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/10 uppercase ring-2 ring-amber-400/20";
+//         // Badge do 1º Lugar - Medalha Dourada
+//         rank.className = "shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-black bg-gradient-to-br from-amber-400 via-yellow-500 to-amber-600 text-slate-950 shadow-md shadow-amber-500/10 uppercase ring-2 ring-amber-400/20";
 
-        content.className = "min-w-0 flex-1";
+//         content.className = "min-w-0 flex-1";
 
-        // Textos internos
-        title.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1";
-        label.className = "text-[15px] font-bold text-white truncate leading-tight tracking-tight mb-0.5";
-        value.className = "text-xs font-semibold text-emerald-400 leading-none flex items-center gap-1";
+//         // Textos internos
+//         title.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1";
+//         label.className = "text-[15px] font-bold text-white truncate leading-tight tracking-tight mb-0.5";
+//         value.className = "text-xs font-semibold text-emerald-400 leading-none flex items-center gap-1";
 
-        rank.textContent = "1º";
-        title.textContent = item.title;
-        label.textContent = item.label;
-        value.textContent = `🏆 ${item.value} ${item.unit}`;
+//         rank.textContent = "1º";
+//         title.textContent = item.title;
+//         label.textContent = item.label;
+//         value.textContent = `🏆 ${item.value} ${item.unit}`;
 
-        content.appendChild(title);
-        content.appendChild(label);
-        content.appendChild(value);
+//         content.appendChild(title);
+//         content.appendChild(label);
+//         content.appendChild(value);
 
-        card.appendChild(rank);
-        card.appendChild(content);
-        container.appendChild(card);
-    });
-}
+//         card.appendChild(rank);
+//         card.appendChild(content);
+//         container.appendChild(card);
+//     });
+// }
 
 function openProspectList(type) {
     const rows = getRowsByDrilldownType(type);
