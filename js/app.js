@@ -107,31 +107,19 @@ function renderPodiums(currentData) {
     renderPodiumList("bestPodiumList", bestItems);
 }
 
-function getPodiumRankingGroups(data) {
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+function getPodiumRankingGroups(currentData) {
+    // ALTERADO: Filtra os dados de forma limpa usando a inteligência do isWon
+    const wonOnlyNormal = currentData.filter(isWon);
+    const wonOnlySellers = currentData.filter(isWon);
 
-    const wonWithPlan = wonOnly.filter(item =>
-        String(item[COLUMN_MAP.plano] || "").trim() !== ""
-    )
-
-    const lostOnly = data.filter(item =>
-        STATUS.lost.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    const formatName = (mapName, key) => {
+        if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
+        return key;
+    };
 
     return [
         {
-            title: "Planos",
-            unit: "vendas",
-            entries: getRankingEntries(groupBy(wonWithPlan, COLUMN_MAP.plano), 10)
-        },
-        {
-            title: "Vendedores",
+            title: "Vendedor",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
                 .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
