@@ -531,9 +531,14 @@ function isWonStatus(item) {
 }
 
 function isLostStatus(item) {
+    // 1. Se o item já passou no teste de ser uma venda real, 
+    // ele NUNCA pode ser considerado perda, não importa o status.
+    if (isWon(item)) return false;
+
+    // 2. Caso contrário, verifica se o status está na lista de perdidos
     return STATUS.lost.includes(
         normalize(item[COLUMN_MAP.status])
-    )
+    );
 }
 
 function getSplitStatusEntries(data, columnName, limit = 8) {
