@@ -107,44 +107,6 @@ function renderPodiums(currentData) {
     renderPodiumList("bestPodiumList", bestItems);
 }
 
-// function getPodiumRankingGroups(currentData) {
-//     // Pega apenas as vendas ganhas para contar o volume de sucesso
-//     const wonOnlyNormal = currentData.filter(item =>
-//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-//     );
-
-//     const wonOnlySellers = currentData.filter(item =>
-//         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
-//     );
-
-//     // Função de segurança para garantir que exiba "Leandro" e não "74"
-//     const formatName = (mapName, key) => {
-//         if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
-//         return key;
-//     };
-
-//     // A ordem aqui dita as colunas: 1º Vendedor (Esq) -> 2º Canal (Meio) -> 3º Campanha (Dir)
-//     return [
-//         {
-//             title: "Vendedor",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
-//                 .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
-//         },
-//         {
-//             title: "Canal de Venda",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
-//                 .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
-//         },
-//         {
-//             title: "Campanha",
-//             unit: "vendas",
-//             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
-//                 .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
-//         }
-//     ];
-// }
 
 function getPodiumRankingGroups(currentData) {
     // ALTERADO: Filtra os dados de forma limpa usando a inteligência do isWon
@@ -395,16 +357,14 @@ function getRowsByDrilldownType(type) {
 function isWon(item) {
     const hasWonStatus = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
 
-    const contractStatus = item[COLUMN_MAP.contrato];
-    const isContractActive = contractStatus && normalize(contractStatus) === normalize("ativo");
-
     const planSelected = item[COLUMN_MAP.plano];
     const hasPlan = planSelected &&
+        normalize(planSelected) !== null &&
         normalize(planSelected) !== "" &&
         normalize(planSelected) !== "undefined" &&
         normalize(planSelected) !== "null";
 
-    return hasWonStatus && isContractActive && hasPlan;
+    return hasWonStatus;
 }
 
 
