@@ -1,4 +1,5 @@
 const CAMPAIGN_MAP = {
+    "32": "RESGATE PROMOCIONAL",
     "31": "TAXA PAGA - 50% OFF 2X",
     "30": "TAXA PAGA - PRIMEIRA À R$50,00 (OU ISENTO)",
     "29": "Troca de titularidade",
