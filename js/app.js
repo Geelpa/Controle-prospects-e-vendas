@@ -1,62 +1,79 @@
 function processData(data) {
     currentFilteredData = data;
 
-    const total = data.length
+    // 1. FUNÇÃO AUXILIAR: Converte valores da planilha (ex: "R$ 149,90" ou "100,00") em números reais
+    const parseNumber = (value) => {
+        if (value === undefined || value === null) return 0;
+        if (typeof value === 'number') return value;
 
-    // ALTERADO: Agora usa a nossa nova função isWon com critérios rígidos
+        const cleanValue = value.toString()
+            .replace(/[R$\s]/g, '') // Remove R$ e espaços
+            .replace(/\./g, '')     // Remove pontos de milhar
+            .replace(',', '.');     // Transforma a vírgula decimal em ponto
+
+        return parseFloat(cleanValue) || 0;
+    };
+
+    // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base (Adicionais/Trocas)
+    const isNewProspect = (item) => {
+        const plano = normalize(item[COLUMN_MAP.plano] || "");
+        const campanha = normalize(item[COLUMN_MAP.campanha] || "");
+        const canal = normalize(item[COLUMN_MAP.canal] || "");
+        const invalidTerms = ["adicional", "troca de titularidade"];
+
+        return !invalidTerms.some(term =>
+            plano.includes(term) || campanha.includes(term) || canal.includes(term)
+        );
+    };
+
+    const total = data.length;
+
+    // Filtros de contagem por Status
     const won = data.filter(isWon).length;
 
     const lost = data.filter(item =>
         STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
-    ).length
+    ).length;
 
     const noViability = data.filter(item =>
         STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
-    ).length
+    ).length;
 
     const inProgress = data.filter(item =>
         STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
-    ).length
+    ).length;
 
+    // ALTERADO: O denominador de conversão agora ignora os "falsos prospects" da base
     const workableSales = data.filter(item =>
-        isWorkableSaleStatus(item)
-    ).length
+        isWorkableSaleStatus(item) && isNewProspect(item)
+    ).length;
 
     const conversion =
         workableSales > 0
             ? ((won / workableSales) * 100).toFixed(1)
-            : 0
+            : 0;
 
-    // ALTERADO: Pega os dados brutos filtrando apenas vendas reais confirmadas
+    // Filtra apenas as vendas reais confirmadas para o cálculo financeiro
     const wonOnly = data.filter(isWon);
 
-    let totalRevenue = 0
+    let totalRevenue = 0;
+    let totalTaxRevenue = 0; // Caso queira usar o total acumulado de taxas futuramente
 
+    // SUBSTITUÍDO: Agora a matemática é feita direto com os valores reais da planilha!
     wonOnly.forEach(item => {
-        const planId = item[COLUMN_MAP.plano]
-        let price = 0
+        const price = parseCurrencyNumber(item[COLUMN_MAP.valorContrato]);
+        const tax = parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]);
 
-        if (PLAN_MAP[planId]) {
-            price = PLAN_MAP[planId].price
-        } else {
-            const foundPlan =
-                Object.values(PLAN_MAP).find(plan =>
-                    normalize(plan.name) ===
-                    normalize(planId)
-                )
-
-            if (foundPlan) {
-                price = foundPlan.price
-            }
-        }
-        totalRevenue += price
-    })
+        totalRevenue += price;
+        totalTaxRevenue += tax; // Acumula o valor das taxas pagas
+    });
 
     const averageTicket =
         wonOnly.length > 0
             ? totalRevenue / wonOnly.length
-            : 0
+            : 0;
 
+    // Atualiza os blocos visuais do painel
     updateKPIs({
         total,
         won,
@@ -72,19 +89,25 @@ function processData(data) {
                     currency: "BRL"
                 }
             )
-    })
+    });
 
-    // CRUCIAL: Passamos os dados atuais (filtrados por mês/ano/etc) para o pódio controlar internamente
-    renderPodiums(data)
+    // HIGIENIZAÇÃO: Remove o "motivo de perda" de quem é venda ganha antes de renderizar as telas
+    data.forEach(item => {
+        if (isWon(item)) {
+            item[COLUMN_MAP.motivoPerda] = "";
+        }
+    });
 
-    // Gráficos continuam normais
-    createChannelsChart(data)
-    createCampaignsChart(data)
-    createLossReasonsChart(data)
-    createSalesPerDayChart(data)
-    createSellersChart(data)
-    createInstallationChart(data)
-    createPlansChart(data)
+    // Distribui os dados dinâmicos e higienizados para o pódio e gráficos
+    renderPodiums(data);
+
+    createChannelsChart(data);
+    createCampaignsChart(data);
+    createLossReasonsChart(data);
+    createSalesPerDayChart(data);
+    createSellersChart(data);
+    createInstallationChart(data);
+    createPlansChart(data);
 }
 
 function renderPodiums(currentData) {
@@ -113,29 +136,21 @@ function getPodiumRankingGroups(currentData) {
     const wonOnlyNormal = currentData.filter(isWon);
     const wonOnlySellers = currentData.filter(isWon);
 
-    const formatName = (mapName, key) => {
-        if (typeof mapName !== 'undefined' && mapName[key]) return mapName[key];
-        return key;
-    };
-
     return [
         {
             title: "Vendedor",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlySellers, COLUMN_MAP.vendedor), 8)
-                .map(e => [formatName(typeof SELLER_MAP !== 'undefined' ? SELLER_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Canal de Venda",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.canal), 8)
-                .map(e => [formatName(typeof CHANNEL_MAP !== 'undefined' ? CHANNEL_MAP : {}, e[0]), e[1]])
         },
         {
             title: "Campanha",
             unit: "vendas",
             entries: getRankingEntries(groupBy(wonOnlyNormal, COLUMN_MAP.campanha), 8)
-                .map(e => [formatName(typeof CAMPAIGN_MAP !== 'undefined' ? CAMPAIGN_MAP : {}, e[0]), e[1]])
         }
     ];
 }
@@ -384,12 +399,7 @@ function getRankingEntries(grouped, limit) {
 }
 
 function isFreeInstallation(item) {
-    const campaignId = item[COLUMN_MAP.campanha];
-    const campaignName = CAMPAIGN_MAP[campaignId] || "";
-    const normalizedCampaignName = normalize(campaignName);
-    const palavrasFree = ["isenta", "troca", "negociação", "não preenchido"];
-
-    return palavrasFree.some(palavra => normalizedCampaignName.includes(palavra));
+    return parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]) <= 0;
 }
 
 function getListColumns(rows) {
@@ -416,9 +426,6 @@ function getColumnLabel(column) {
 
 function formatListValue(column, value) {
     if (column === COLUMN_MAP.vendedor) return SELLER_MAP[value] || value || "-";
-    if (column === COLUMN_MAP.plano) return PLAN_MAP[value]?.name || value || "-";
-    if (column === COLUMN_MAP.canal) return CHANNEL_MAP[value] || value || "-";
-    if (column === COLUMN_MAP.campanha) return CAMPAIGN_MAP[value] || value || "-";
     return value || "-";
 }
 

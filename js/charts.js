@@ -490,15 +490,15 @@ function getChartDisplayValue(item, columnName) {
     let key = item[columnName]
 
     if (columnName === COLUMN_MAP.plano) {
-        return PLAN_MAP[key]?.name || key || "Sem plano"
+        return key || "Sem plano"
     }
 
     if (columnName === COLUMN_MAP.campanha) {
-        return CAMPAIGN_MAP[key] || `Campanha ${key}`
+        return key || "Sem campanha"
     }
 
     if (columnName === COLUMN_MAP.canal) {
-        return CHANNEL_MAP[key] || `Canal ${key}`
+        return key || "Sem canal"
     }
 
     if (columnName === COLUMN_MAP.vendedor) {
@@ -1019,17 +1019,10 @@ function createInstallationChart(data) {
 
     wonOnly.forEach(item => {
 
-        const campaignId = item[COLUMN_MAP.campanha];
-        const campaignName = CAMPAIGN_MAP[campaignId];
-
-        const normalizedCampaignName = normalize(campaignName || "");
-
-        const palavrasFree = ["isenta", "troca"];
-
-        if (campaignName && palavrasFree.some(palavra => normalizedCampaignName.includes(palavra))) {
-            free++;
-        } else {
+        if (parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]) > 0) {
             paid++;
+        } else {
+            free++;
         }
     })
 

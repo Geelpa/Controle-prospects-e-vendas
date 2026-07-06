@@ -11,34 +11,37 @@ function destroyChart(chart) {
 }
 
 function applyBusinessRules(row) {
-    if (isOwnershipTransferChannel(row)) {
-        row[COLUMN_MAP.campanha] = "29"
-    }
-
     return row
 }
 
 function isOwnershipTransferChannel(row) {
-    const channelId =
+    const channelName =
         row[COLUMN_MAP.canal]
 
-    const channelName =
-        CHANNEL_MAP[channelId] || channelId || ""
+    const originChannel =
+        row[COLUMN_MAP.canalOrigem]
 
-    return normalize(channelId) === "40" ||
-        normalize(channelName) === "troca de titularidade"
+    return normalize(channelName) === "troca de titularidade" ||
+        normalize(originChannel) === "troca de titularidade"
+}
+
+function parseCurrencyNumber(value) {
+    if (value === undefined || value === null) return 0
+    if (typeof value === "number") return value
+
+    const cleanValue = String(value)
+        .replace(/[R$\s]/g, "")
+        .replace(/\./g, "")
+        .replace(",", ".")
+
+    return parseFloat(cleanValue) || 0
 }
 
 function parseDate(dateString) {
 
     if (!dateString) return null
 
-    // REMOVE ESPAÇOS
     dateString = String(dateString).trim()
-
-    // FORMATO:
-    // dd/mm/yyyy
-    // dd/mm/yyyy hh:mm:ss
 
     const [datePart] =
         dateString.split(" ")
@@ -74,40 +77,19 @@ function groupBy(data, columnName) {
 
         let key = item[columnName]
 
-        // PLANOS
         if (columnName === COLUMN_MAP.plano) {
-
-            // SE VIER ID
-            if (PLAN_MAP[key]) {
-
-                key = PLAN_MAP[key].name
-
-            } else {
-
-                // SE JÁ VIER NOME
-                key = key || "Sem plano"
-            }
+            key = key || "Sem plano"
         }
 
-        // CAMPANHAS
         if (columnName === COLUMN_MAP.campanha) {
-
-            key =
-                CAMPAIGN_MAP[key] ||
-                `Campanha ${key}`
+            key = key || "Sem campanha"
         }
 
-        // CANAIS
         if (columnName === COLUMN_MAP.canal) {
-
-            key =
-                CHANNEL_MAP[key] ||
-                `Canal ${key}`
+            key = key || "Sem canal"
         }
 
-        // VENDEDORES
         if (columnName === COLUMN_MAP.vendedor) {
-
             key =
                 SELLER_MAP[key] ||
                 `Vendedor ${key}`
@@ -118,7 +100,6 @@ function groupBy(data, columnName) {
     })
 
     return Object.fromEntries(
-
         Object.entries(grouped)
             .sort((a, b) => b[1] - a[1])
     )
@@ -126,10 +107,8 @@ function groupBy(data, columnName) {
 
 function extractBestDate(row) {
 
-    // PROCURA COLUNAS QUE CONTENHAM "data"
     const possibleDateColumns = Object.keys(row)
         .filter(key =>
-
             normalize(key)
                 .includes("data")
         )
@@ -148,7 +127,6 @@ function extractBestDate(row) {
             parseDate(value)
 
         if (parsed) {
-
             validDates.push(parsed)
         }
     })
@@ -157,7 +135,6 @@ function extractBestDate(row) {
         return null
     }
 
-    // PEGA A MAIS RECENTE
     validDates.sort((a, b) => b - a)
 
     return validDates[0]

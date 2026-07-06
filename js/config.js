@@ -2,16 +2,21 @@ let sellersChart
 let installationChart
 let rawData = []
 let currentFilteredData = []
+
 const COLUMN_MAP = {
+    id: "ID",
+    razao: "Razão",
     canal: "Canal de venda",
-    campanha: "Campanha",
+    campanha: "Campanha de venda",
     vendedor: "Vendedor",
-    plano: "Plano de venda",
     status: "Status",
-    motivoPerda: "Descrição",
-    data: "Data do cadastro",
-    contrato: "Status contrato",
-    telefone: "Telefone"
+    motivoPerda: "Motivo perdemos",
+    plano: "Plano de venda",
+    data: "Data do Cadastro",
+    contrato: "Contrato Gerado",
+    telefone: "Telefone celular",
+    valorContrato: "Valor do plano",
+    taxaAtivacao: "Taxa de ativação"
 }
 
 const STATUS = {
@@ -52,8 +57,6 @@ const MONTH_MAP = {
     11: "Novembro",
     12: "Dezembro"
 }
-
-
 
 let originalData = []
 let plansChart

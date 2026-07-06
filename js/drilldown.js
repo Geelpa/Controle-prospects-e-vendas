@@ -29,7 +29,6 @@ const LIST_COLUMN_CANDIDATES = [
     "Telefone",
     "Celular",
     COLUMN_MAP.status,
-    COLUMN_MAP.status,
     COLUMN_MAP.contrato,
     COLUMN_MAP.motivoPerda,
     COLUMN_MAP.vendedor,
@@ -177,14 +176,7 @@ function isWon(item) {
 
 
 function isFreeInstallation(item) {
-    const campaignId = item[COLUMN_MAP.campanha];
-    const campaignName = CAMPAIGN_MAP[campaignId] || "";
-
-    const normalizedCampaignName = normalize(campaignName);
-
-    const palavrasFree = ["isenta", "troca", "negociação", "não preenchido"];
-
-    return palavrasFree.some(palavra => normalizedCampaignName.includes(palavra));
+    return parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]) <= 0;
 }
 
 function renderProspectTable(rows, options = {}) {
@@ -307,18 +299,6 @@ function getColumnLabel(column) {
 function formatListValue(column, value) {
     if (column === COLUMN_MAP.vendedor) {
         return SELLER_MAP[value] || value || "-"
-    }
-
-    if (column === COLUMN_MAP.plano) {
-        return PLAN_MAP[value]?.name || value || "-"
-    }
-
-    if (column === COLUMN_MAP.canal) {
-        return CHANNEL_MAP[value] || value || "-"
-    }
-
-    if (column === COLUMN_MAP.campanha) {
-        return CAMPAIGN_MAP[value] || value || "-"
     }
 
     return value || "-"
