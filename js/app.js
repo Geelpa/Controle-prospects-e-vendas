@@ -1,17 +1,29 @@
 function processData(data) {
     currentFilteredData = data;
 
-    // 1. FUNÇÃO AUXILIAR: Converte valores da planilha (ex: "R$ 149,90" ou "100,00") em números reais
+    // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos brasileiros e americanos (ex: 122.110000000)
     const parseNumber = (value) => {
-        if (value === undefined || value === null) return 0;
+        if (value === undefined || value === null || String(value).trim() === "") return 0;
         if (typeof value === 'number') return value;
 
-        const cleanValue = value.toString()
-            .replace(/[R$\s]/g, '') // Remove R$ e espaços
-            .replace(/\./g, '')     // Remove pontos de milhar
-            .replace(',', '.');     // Transforma a vírgula decimal em ponto
+        let cleanValue = value.toString().replace(/[R$\s]/g, '').trim();
 
-        return parseFloat(cleanValue) || 0;
+        // Se o número tiver ponto e vírgula (ex: 1.234,56), limpa o ponto de milhar brasileiro
+        if (cleanValue.includes(',') && cleanValue.includes('.')) {
+            cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
+        } else {
+            // Se tiver apenas vírgula, transforma em ponto decimal
+            cleanValue = cleanValue.replace(',', '.');
+        }
+
+        // Se houver mais de um ponto residual decorrente de floats longos do sistema
+        if ((cleanValue.match(/\./g) || []).length > 1) {
+            const parts = cleanValue.split('.');
+            cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
+        }
+
+        const result = parseFloat(cleanValue);
+        return isNaN(result) ? 0 : result;
     };
 
     // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base (Adicionais/Trocas)
@@ -43,9 +55,9 @@ function processData(data) {
         STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    // ALTERADO: O denominador de conversão agora ignora os "falsos prospects" da base
+    // O denominador de conversão agora ignora os "falsos prospects" da base
     const workableSales = data.filter(item =>
-        isWorkableSaleStatus(item) && isNewProspect(item)
+        typeof isWorkableSaleStatus === "function" ? isWorkableSaleStatus(item) && isNewProspect(item) : isNewProspect(item)
     ).length;
 
     const conversion =
@@ -57,57 +69,72 @@ function processData(data) {
     const wonOnly = data.filter(isWon);
 
     let totalRevenue = 0;
-    let totalTaxRevenue = 0; // Caso queira usar o total acumulado de taxas futuramente
+    let totalTaxRevenue = 0; // Esta variável vai acumular o valor de todas as taxas
 
-    // SUBSTITUÍDO: Agora a matemática é feita direto com os valores reais da planilha!
+    // Passa por cada venda ganha e soma os valores puros
     wonOnly.forEach(item => {
-        const price = parseCurrencyNumber(item[COLUMN_MAP.valorContrato]);
-        const tax = parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]);
+        const price = parseNumber(item[COLUMN_MAP.valorContrato]);
+        const tax = parseNumber(item[COLUMN_MAP.taxaAtivacao]);
 
         totalRevenue += price;
-        totalTaxRevenue += tax; // Acumula o valor das taxas pagas
+        totalTaxRevenue += tax; // Soma direta: se tiver 30 campos de 100.00, vai somar 3000.00
     });
 
-    const averageTicket =
-        wonOnly.length > 0
-            ? totalRevenue / wonOnly.length
-            : 0;
+    // Calcula a média do ticket dividindo o faturamento pelas vendas ganhas
+    const avgValue = wonOnly.length > 0 ? totalRevenue / wonOnly.length : 0;
+
+    /* ==========================================================================
+       FORMATANDO OS VALORES EXATAMENTE COMO VOCÊ PRECISA
+       ========================================================================== */
+
+
+    // Ticket Médio: Já está sem R$ (Ex: 122,11)
+    const averageTicket = avgValue.toLocaleString("pt-BR", {
+        style: "decimal",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+
+    /* ==========================================================================
+       ALTERADO: Remove o "R$" da Taxa de Ativação Total (Ex: 3.000,00)
+       ========================================================================== */
+    const totalTaxPaid = totalTaxRevenue.toLocaleString("pt-BR", {
+        style: "decimal",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 
     // Atualiza os blocos visuais do painel
-    updateKPIs({
-        total,
-        won,
-        lost,
-        noViability,
-        inProgress,
-        conversion,
-        averageTicket:
-            averageTicket.toLocaleString(
-                "pt-BR",
-                {
-                    style: "currency",
-                    currency: "BRL"
-                }
-            )
-    });
+    if (typeof updateKPIs === "function") {
+        updateKPIs({
+            total,
+            won,
+            lost,
+            noViability,
+            inProgress,
+            conversion,
+            averageTicket,
+            totalTaxPaid // <-- Enviando o total arrecadado (ex: R$ 3.000,00)
+        });
+    }
 
-    // HIGIENIZAÇÃO: Remove o "motivo de perda" de quem é venda ganha antes de renderizar as telas
-    data.forEach(item => {
-        if (isWon(item)) {
-            item[COLUMN_MAP.motivoPerda] = "";
-        }
-    });
+    // Chama a renderização dos gráficos (charts.js)
+    // if (typeof createOverviewChart === "function") createOverviewChart(data);
+    if (typeof createSellersChart === "function") createSellersChart(data);
+    if (typeof createChannelsChart === "function") createChannelsChart(data);
+    if (typeof createCampaignsChart === "function") createCampaignsChart(data);
+    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(data);
+    if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
+    if (typeof createInstallationChart === "function") createInstallationChart(data);
+    if (typeof createPlansChart === "function") createPlansChart(data);
 
-    // Distribui os dados dinâmicos e higienizados para o pódio e gráficos
-    renderPodiums(data);
-
-    createChannelsChart(data);
-    createCampaignsChart(data);
-    createLossReasonsChart(data);
-    createSalesPerDayChart(data);
-    createSellersChart(data);
-    createInstallationChart(data);
-    createPlansChart(data);
+    // createChannelsChart(data);
+    // createCampaignsChart(data);
+    // createLossReasonsChart(data);
+    // createSalesPerDayChart(data);
+    // createSellersChart(data);
+    // createInstallationChart(data);
+    // createPlansChart(data);
 }
 
 function renderPodiums(currentData) {

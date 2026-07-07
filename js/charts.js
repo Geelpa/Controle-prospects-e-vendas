@@ -130,25 +130,28 @@ const stackedBarValueLabelsPlugin = {
             })
         })
 
-        const lastDataset =
-            datasets[datasets.length - 1]
-        const lastMeta =
-            chart.getDatasetMeta(datasets.length - 1)
+        const lastDataset = datasets[datasets.length - 1];
+        const lastMeta = chart.getDatasetMeta(datasets.length - 1);
 
-        lastMeta.data.forEach((bar, index) => {
-            const total =
-                totals[index]
+        // Garante que o meta e os dados da barra existem antes de rodar o loop
+        if (lastMeta && lastMeta.data) {
+            lastMeta.data.forEach((bar, index) => {
+                const total = totals ? totals[index] : null;
 
-            if (!total) return
+                // Se não tiver o total ou se a barra ainda não foi calculada pelo Chart.js, ignora e não quebra
+                if (!total || !bar || typeof bar.x === 'undefined' || typeof bar.y === 'undefined') return;
 
-            ctx.textAlign = "left"
-            ctx.fillStyle = CHART_COLORS.text
-            ctx.fillText(
-                `Total ${total}`,
-                bar.x + 8,
-                bar.y
-            )
-        })
+                ctx.textAlign = "left";
+                ctx.fillStyle = CHART_COLORS.text;
+
+                // Desenha o texto com segurança
+                ctx.fillText(
+                    `Total ${total}`,
+                    bar.x + 8,
+                    bar.y
+                );
+            });
+        }
 
         ctx.restore()
     }

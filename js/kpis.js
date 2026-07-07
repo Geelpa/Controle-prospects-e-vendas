@@ -5,7 +5,8 @@ function updateKPIs({
     noViability,
     inProgress,
     conversion,
-    averageTicket
+    averageTicket,
+    totalTaxPaid // <-- Adicione aqui nos parâmetros
 }) {
     document.getElementById("averageTicket").innerText =
         averageTicket
@@ -24,6 +25,9 @@ function updateKPIs({
 
     document.getElementById("inProgressDeals").innerText =
         inProgress
+
+    document.getElementById("totalTaxPaid").innerText =
+        totalTaxPaid
 
     document.getElementById("conversionRate").innerText =
         `${conversion}%`
