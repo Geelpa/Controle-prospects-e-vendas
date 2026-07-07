@@ -40,86 +40,107 @@ function processData(data) {
 
     const total = data.length;
 
-    // Filtros de contagem por Status
-    const won = data.filter(isWon).length;
+    // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (CORRIGIDO) ---
 
-    const lost = data.filter(item =>
+    // 1. Filtramos apenas as linhas que pertencem a NOVOS PROSPECTS (Expurgando movimentações de base)
+    const prospectsData = data.filter(isNewProspect);
+
+    // 2. CORREÇÃO DO ERRO: Criamos uma nova constante dedicada para os prospects filtrados
+    const totalProspects = prospectsData.length;
+
+    // 3. Contagem correta por status, olhando APENAS para os novos prospects
+    const won = prospectsData.filter(isWon).length;
+
+    const lost = prospectsData.filter(item =>
         STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    const noViability = data.filter(item =>
+    const noViability = prospectsData.filter(item =>
         STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    const inProgress = data.filter(item =>
+    const inProgress = prospectsData.filter(item =>
         STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    // O denominador de conversão agora ignora os "falsos prospects" da base
-    const workableSales = data.filter(item =>
-        typeof isWorkableSaleStatus === "function" ? isWorkableSaleStatus(item) && isNewProspect(item) : isNewProspect(item)
+    // 4. O denominador (Oportunidades Trabalháveis):
+    const workableSales = prospectsData.filter(item =>
+        typeof isWorkableSaleStatus === "function" ? isWorkableSaleStatus(item) : true
     ).length;
 
+    // 5. CÁLCULO DE SEGURANÇA DA CONVERSÃO (Impede passar de 100%):
+    const safeWorkableSales = workableSales < won ? won : workableSales;
+
     const conversion =
-        workableSales > 0
-            ? ((won / workableSales) * 100).toFixed(1)
+        safeWorkableSales > 0
+            ? ((won / safeWorkableSales) * 100).toFixed(1)
             : 0;
 
-    // Filtra apenas as vendas reais confirmadas para o cálculo financeiro
+
+    // --- BLOCO 2: FINANCEIRO TOTALMENTE ISOLADO (Sem interferir na conversão acima) ---
+    let totalRevenue = 0;
+    let totalTaxRevenue = 0;
+    let validContractCount = 0; // Quantidade de planos reais vendidos
+
+    // Filtra apenas as linhas com status ganho ("vencemos")
     const wonOnly = data.filter(isWon);
 
-    let totalRevenue = 0;
-    let totalTaxRevenue = 0; // Esta variável vai acumular o valor de todas as taxas
-
-    // Passa por cada venda ganha e soma os valores puros
     wonOnly.forEach(item => {
+        // Converte os valores tratando qualquer formatação regional da planilha
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
         const tax = parseNumber(item[COLUMN_MAP.taxaAtivacao]);
 
-        totalRevenue += price;
-        totalTaxRevenue += tax; // Soma direta: se tiver 30 campos de 100.00, vai somar 3000.00
+        // 1. REGRA DO TICKET MÉDIO (Pura para o Valor do Plano)
+        // Se o preço do plano for maior que zero, ele é uma venda concluída e válida
+        if (price > 0) {
+            totalRevenue += price;
+            validContractCount++; // Só divide por quem tem plano real ativo
+        }
+
+        // 2. REGRA DA TAXA DE ATIVAÇÃO (Totalmente independente)
+        // Se houver valor de taxa, acumula no montante financeiro de taxas,
+        // sem nunca misturar ou alterar o divisor do Ticket Médio acima
+        if (tax > 0) {
+            totalTaxRevenue += tax;
+        }
     });
 
-    // Calcula a média do ticket dividindo o faturamento pelas vendas ganhas
-    const avgValue = wonOnly.length > 0 ? totalRevenue / wonOnly.length : 0;
+    // O Ticket Médio divide o faturamento total dos planos estritamente pela quantidade de planos válidos
+    const avgValue = validContractCount > 0 ? totalRevenue / validContractCount : 0;
+
 
     /* ==========================================================================
-       FORMATANDO OS VALORES EXATAMENTE COMO VOCÊ PRECISA
-       ========================================================================== */
+         FORMATANDO OS VALORES EXATAMENTE COMO VOCÊ PRECISA
+         ========================================================================== */
 
-
-    // Ticket Médio: Já está sem R$ (Ex: 122,11)
+    // Ticket Médio continua normal com duas casas decimais (Ex: 122,11)
     const averageTicket = avgValue.toLocaleString("pt-BR", {
         style: "decimal",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
 
-    /* ==========================================================================
-       ALTERADO: Remove o "R$" da Taxa de Ativação Total (Ex: 3.000,00)
-       ========================================================================== */
-    const totalTaxPaid = totalTaxRevenue.toLocaleString("pt-BR", {
+    // TAXA DE ADESÃO: Remove tudo após a vírgula (Ex: 1.550)
+    // O Math.round() arredonda para o inteiro mais próximo e o '0' nas frações elimina os centavos
+    const formattedTaxRevenue = Math.round(totalTaxRevenue).toLocaleString("pt-BR", {
         style: "decimal",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
     });
 
-    // Atualiza os blocos visuais do painel
-    if (typeof updateKPIs === "function") {
-        updateKPIs({
-            total,
-            won,
-            lost,
-            noViability,
-            inProgress,
-            conversion,
-            averageTicket,
-            totalTaxPaid // <-- Enviando o total arrecadado (ex: R$ 3.000,00)
-        });
-    }
+    // Envia os dados limpos e corrigidos para o painel de KPIs
+    updateKPIs({
+        total: totalProspects,
+        won,
+        lost,
+        noViability,
+        inProgress,
+        conversion,
+        averageTicket,
+        totalTaxPaid: formattedTaxRevenue // <--- Aqui passa a taxa sem os centavos
+    });
 
     // Chama a renderização dos gráficos (charts.js)
-    // if (typeof createOverviewChart === "function") createOverviewChart(data);
     if (typeof createSellersChart === "function") createSellersChart(data);
     if (typeof createChannelsChart === "function") createChannelsChart(data);
     if (typeof createCampaignsChart === "function") createCampaignsChart(data);
@@ -127,14 +148,6 @@ function processData(data) {
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
     if (typeof createInstallationChart === "function") createInstallationChart(data);
     if (typeof createPlansChart === "function") createPlansChart(data);
-
-    // createChannelsChart(data);
-    // createCampaignsChart(data);
-    // createLossReasonsChart(data);
-    // createSalesPerDayChart(data);
-    // createSellersChart(data);
-    // createInstallationChart(data);
-    // createPlansChart(data);
 }
 
 function renderPodiums(currentData) {
