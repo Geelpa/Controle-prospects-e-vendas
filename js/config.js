@@ -35,11 +35,11 @@ const STATUS = {
 
     inProgress: [
         "",
+        "--",
         "novo",
         "negociando",
         "apresentando",
-        "sondagem",
-        "sem status"
+        "sondagem"
     ]
 }
 
