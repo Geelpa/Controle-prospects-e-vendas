@@ -1,22 +1,19 @@
 function processData(data) {
+    // Voltamos a usar o 'data' original direto para não perder nenhuma linha da planilha!
     currentFilteredData = data;
 
-    // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos brasileiros e americanos (ex: 122.110000000)
+    // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos
     const parseNumber = (value) => {
         if (value === undefined || value === null || String(value).trim() === "") return 0;
         if (typeof value === 'number') return value;
 
         let cleanValue = value.toString().replace(/[R$\s]/g, '').trim();
-
-        // Se o número tiver ponto e vírgula (ex: 1.234,56), limpa o ponto de milhar brasileiro
         if (cleanValue.includes(',') && cleanValue.includes('.')) {
             cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
         } else {
-            // Se tiver apenas vírgula, transforma em ponto decimal
             cleanValue = cleanValue.replace(',', '.');
         }
 
-        // Se houver mais de um ponto residual decorrente de floats longos do sistema
         if ((cleanValue.match(/\./g) || []).length > 1) {
             const parts = cleanValue.split('.');
             cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
@@ -26,7 +23,7 @@ function processData(data) {
         return isNaN(result) ? 0 : result;
     };
 
-    // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base (Adicionais/Trocas)
+    // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base
     const isNewProspect = (item) => {
         const plano = normalize(item[COLUMN_MAP.plano] || "");
         const campanha = normalize(item[COLUMN_MAP.campanha] || "");
@@ -38,37 +35,28 @@ function processData(data) {
         );
     };
 
-    const total = data.length;
 
-    // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (CORRIGIDO) ---
+    // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
-    // 1. Filtramos apenas as linhas que pertencem a NOVOS PROSPECTS (Expurgando movimentações de base)
     const prospectsData = data.filter(isNewProspect);
-
-    // 2. CORREÇÃO DO ERRO: Criamos uma nova constante dedicada para os prospects filtrados
     const totalProspects = prospectsData.length;
 
-    // 3. Contagem correta por status, olhando APENAS para os novos prospects
+    // A contagem usa a inteligência de dupla checagem direta do arquivo
     const won = prospectsData.filter(isWon).length;
 
     const lost = prospectsData.filter(item =>
-        STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
+        !isWon(item) && STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
     const noViability = prospectsData.filter(item =>
-        STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
+        !isWon(item) && STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
     const inProgress = prospectsData.filter(item =>
-        STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
+        !isWon(item) && STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    // 4. O denominador (Oportunidades Trabalháveis):
-    const workableSales = prospectsData.filter(item =>
-        typeof isWorkableSaleStatus === "function" ? isWorkableSaleStatus(item) : true
-    ).length;
-
-    // 5. CÁLCULO DE SEGURANÇA DA CONVERSÃO (Impede passar de 100%):
+    const workableSales = prospectsData.filter(isWorkableSaleStatus).length;
     const safeWorkableSales = workableSales < won ? won : workableSales;
 
     const conversion =
@@ -77,58 +65,44 @@ function processData(data) {
             : 0;
 
 
-    // --- BLOCO 2: FINANCEIRO TOTALMENTE ISOLADO (Sem interferir na conversão acima) ---
+    // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
     let totalRevenue = 0;
     let totalTaxRevenue = 0;
-    let validContractCount = 0; // Quantidade de planos reais vendidos
+    let validContractCount = 0;
 
-    // Filtra apenas as linhas com status ganho ("vencemos")
     const wonOnly = data.filter(isWon);
 
     wonOnly.forEach(item => {
-        // Converte os valores tratando qualquer formatação regional da planilha
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
         const tax = parseNumber(item[COLUMN_MAP.taxaAtivacao]);
 
-        // 1. REGRA DO TICKET MÉDIO (Pura para o Valor do Plano)
-        // Se o preço do plano for maior que zero, ele é uma venda concluída e válida
         if (price > 0) {
             totalRevenue += price;
-            validContractCount++; // Só divide por quem tem plano real ativo
+            validContractCount++;
         }
 
-        // 2. REGRA DA TAXA DE ATIVAÇÃO (Totalmente independente)
-        // Se houver valor de taxa, acumula no montante financeiro de taxas,
-        // sem nunca misturar ou alterar o divisor do Ticket Médio acima
         if (tax > 0) {
             totalTaxRevenue += tax;
         }
     });
 
-    // O Ticket Médio divide o faturamento total dos planos estritamente pela quantidade de planos válidos
     const avgValue = validContractCount > 0 ? totalRevenue / validContractCount : 0;
 
+    // --- BLOCO 3: FORMATAÇÃO DOS RESULTADOS ---
 
-    /* ==========================================================================
-         FORMATANDO OS VALORES EXATAMENTE COMO VOCÊ PRECISA
-         ========================================================================== */
-
-    // Ticket Médio continua normal com duas casas decimais (Ex: 122,11)
     const averageTicket = avgValue.toLocaleString("pt-BR", {
         style: "decimal",
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
 
-    // TAXA DE ADESÃO: Remove tudo após a vírgula (Ex: 1.550)
-    // O Math.round() arredonda para o inteiro mais próximo e o '0' nas frações elimina os centavos
     const formattedTaxRevenue = Math.round(totalTaxRevenue).toLocaleString("pt-BR", {
         style: "decimal",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0
     });
 
-    // Envia os dados limpos e corrigidos para o painel de KPIs
+    // --- BLOCO DE ATUALIZAÇÃO DOS CARDS NA TELA ---
     updateKPIs({
         total: totalProspects,
         won,
@@ -137,12 +111,34 @@ function processData(data) {
         inProgress,
         conversion,
         averageTicket,
-        totalTaxPaid: formattedTaxRevenue // <--- Aqui passa a taxa sem os centavos
+        totalTaxPaid: formattedTaxRevenue
     });
 
-    // Chama a renderização dos gráficos (charts.js)
-    if (typeof createSellersChart === "function") createSellersChart(data);
-    if (typeof createChannelsChart === "function") createChannelsChart(data);
+    // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
+    // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
+    // Isso evita usar { ...item } e quebrar a leitura da planilha!
+    const getSellersName = (item) => {
+        const sellerFromContract = item[COLUMN_MAP.vendedorContrato];
+        if (sellerFromContract && String(sellerFromContract).trim() !== "" && normalize(sellerFromContract) !== "undefined") {
+            return sellerFromContract;
+        }
+        return item[COLUMN_MAP.vendedor];
+    };
+
+    // Criamos uma função de mapeamento exclusiva e segura para os gráficos que dependem do vendedor
+    const chartDataWithCorrectSellers = data.map(item => {
+        // Criamos um proxy leve, apenas substituindo a propriedade de texto do vendedor com segurança
+        return {
+            ...item,
+            [COLUMN_MAP.vendedor]: getSellersName(item)
+        };
+    });
+
+    // Alimentamos os gráficos específicos de Vendedor e Canal com os nomes auditados
+    if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
+    if (typeof createChannelsChart === "function") createChannelsChart(chartDataWithCorrectSellers);
+
+    // Os gráficos que não dependem do vendedor continuam recebendo a base pura e original de 124 registros
     if (typeof createCampaignsChart === "function") createCampaignsChart(data);
     if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(data);
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
@@ -410,22 +406,38 @@ function getRowsByDrilldownType(type) {
 }
 
 function isWon(item) {
-    const hasWonStatus = STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
+    // 1. Primeira Métrica: O comercial marcou como ganho/vencemos?
+    const hasWonStatus = STATUS.won && STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
 
-    const planSelected = item[COLUMN_MAP.plano];
-    const hasPlan = planSelected &&
-        normalize(planSelected) !== null &&
-        normalize(planSelected) !== "" &&
-        normalize(planSelected) !== "undefined" &&
-        normalize(planSelected) !== "null";
+    // 2. Segunda Métrica (Auditoria): Existe um contrato preenchido e valor maior que zero?
+    const contractField = item[COLUMN_MAP.contrato];
+    const contractClean = String(contractField || "").trim().toLowerCase();
 
-    return hasWonStatus;
+    const hasContractEvidencie = contractClean !== "" &&
+        contractClean !== "-" &&
+        contractClean !== "nao" &&
+        contractClean !== "não" &&
+        contractClean !== "null" &&
+        contractClean !== "undefined";
+
+    // Usamos a função parseNumber (que já está declarada no topo do processData)
+    // Se a função global for necessária aqui, usamos o tratamento seguro:
+    let rawPrice = item[COLUMN_MAP.valorContrato];
+    let cleanPrice = String(rawPrice || "").replace(/[R$\s]/g, '').replace(',', '.').trim();
+    const hasPrice = parseFloat(cleanPrice) > 0;
+
+    const hasFinancialProof = hasContractEvidencie && hasPrice;
+
+    // REGRA DE OURO: Se passou em QUALQUER uma das duas métricas, a venda está confirmada!
+    return hasWonStatus || hasFinancialProof;
 }
 
-
 function isWorkableSaleStatus(item) {
+    // Uma oportunidade é considerada trabalhada se ela foi concluída (isWon) ou se foi perdida
     const status = normalize(item[COLUMN_MAP.status]);
-    return STATUS.won.includes(status) || STATUS.lost.includes(status);
+    const isLostStatus = STATUS.lost && STATUS.lost.includes(status);
+
+    return isWon(item) || isLostStatus;
 }
 
 function getRankingEntries(grouped, limit) {
