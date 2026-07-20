@@ -32,7 +32,7 @@ const isNewProspect = (item, COLUMN_MAP) => {
     const plano = localNormalize(item[COLUMN_MAP.plano]);
     const campanha = localNormalize(item[COLUMN_MAP.campanha]);
     const canal = localNormalize(item[COLUMN_MAP.canal]);
-    const invalidTerms = ["adicional", "troca de titularidade"];
+    const invalidTerms = ["adicional"];
 
     return !invalidTerms.some(term =>
         plano.includes(term) || campanha.includes(term) || canal.includes(term)

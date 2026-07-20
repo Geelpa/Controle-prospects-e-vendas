@@ -25,13 +25,12 @@ function processData(data) {
         const plano = normalize(item[COLUMN_MAP.plano] || "");
         const campanha = normalize(item[COLUMN_MAP.campanha] || "");
         const canal = normalize(item[COLUMN_MAP.canal] || "");
-        const invalidTerms = ["adicional", "troca de titularidade"];
+        const invalidTerms = ["adicional"];
 
         return !invalidTerms.some(term =>
             plano.includes(term) || campanha.includes(term) || canal.includes(term)
         );
     };
-
 
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
@@ -64,11 +63,13 @@ function processData(data) {
 
 
     // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
+    // Inclui vendas de planos adicionais como receita de contrato, mas continua tratando
+    // os adicionais como prospects existentes para o funil de novos prospects.
     let totalRevenue = 0;
     let totalTaxRevenue = 0;
     let validContractCount = 0;
 
-    const wonOnly = prospectsData.filter(isWon);
+    const wonOnly = data.filter(isWon);
 
     wonOnly.forEach(item => {
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
