@@ -1,7 +1,4 @@
 function processData(data) {
-    // Voltamos a usar o 'data' original direto para não perder nenhuma linha da planilha!
-    currentFilteredData = data;
-
     // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos
     const parseNumber = (value) => {
         if (value === undefined || value === null || String(value).trim() === "") return 0;
@@ -39,6 +36,7 @@ function processData(data) {
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
     const prospectsData = data.filter(isNewProspect);
+    currentFilteredData = prospectsData;
     const totalProspects = prospectsData.length;
 
     // A contagem usa a inteligência de dupla checagem direta do arquivo
@@ -70,7 +68,7 @@ function processData(data) {
     let totalTaxRevenue = 0;
     let validContractCount = 0;
 
-    const wonOnly = data.filter(isWon);
+    const wonOnly = prospectsData.filter(isWon);
 
     wonOnly.forEach(item => {
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
@@ -126,7 +124,7 @@ function processData(data) {
     };
 
     // Criamos uma função de mapeamento exclusiva e segura para os gráficos que dependem do vendedor
-    const chartDataWithCorrectSellers = data.map(item => {
+    const chartDataWithCorrectSellers = prospectsData.map(item => {
         // Criamos um proxy leve, apenas substituindo a propriedade de texto do vendedor com segurança
         return {
             ...item,
@@ -138,12 +136,12 @@ function processData(data) {
     if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
     if (typeof createChannelsChart === "function") createChannelsChart(chartDataWithCorrectSellers);
 
-    // Os gráficos que não dependem do vendedor continuam recebendo a base pura e original de 124 registros
-    if (typeof createCampaignsChart === "function") createCampaignsChart(data);
-    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(data);
-    if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
-    if (typeof createInstallationChart === "function") createInstallationChart(data);
-    if (typeof createPlansChart === "function") createPlansChart(data);
+    // Todos os gráficos agora usam somente os prospects válidos filtrados para manter os KPIs e drilldowns consistentes.
+    if (typeof createCampaignsChart === "function") createCampaignsChart(prospectsData);
+    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(prospectsData);
+    if (typeof createLossReasonsChart === "function") createLossReasonsChart(prospectsData);
+    if (typeof createInstallationChart === "function") createInstallationChart(prospectsData);
+    if (typeof createPlansChart === "function") createPlansChart(prospectsData);
 }
 
 function renderPodiums(currentData) {
