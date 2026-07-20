@@ -20,7 +20,7 @@ const emptyStatePlugin = {
 
         if (hasData) return
 
-        const { ctx } = chart
+        const { ctx, chartArea } = chart
 
         ctx.save()
         ctx.fillStyle = CHART_COLORS.muted

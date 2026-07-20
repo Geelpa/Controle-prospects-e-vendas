@@ -495,15 +495,6 @@ function copyPhoneToClipboard(phone) {
 }
 
 /* 4. EVENT LISTENERS DO SISTEMA */
-document.querySelectorAll("[data-drilldown]").forEach(card => {
-    card.addEventListener("click", () => openProspectList(card.dataset.drilldown));
-    card.addEventListener("keydown", event => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        openProspectList(card.dataset.drilldown);
-    });
-});
-
 document.getElementById("closeProspectModal").addEventListener("click", closeProspectList);
 
 document.getElementById("prospectModal").addEventListener("click", event => {
