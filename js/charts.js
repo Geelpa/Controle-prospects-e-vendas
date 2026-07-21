@@ -1,14 +1,15 @@
 const CHART_COLORS = {
-    blue: "#6B4C3B",   // chocolate brown
-    cyan: "#A67C52",   // caramel
-    emerald: "#8B5E3C", // milk chocolate (used for 'vencemos')
-    amber: "#C68642",  // toffee
-    rose: "#5C2E2E",   // deep brown
+    blue: "#6B4C3B",   // chocolate brown (dataset)
+    cyan: "#A67C52",   // caramel (dataset)
+    emerald: "#d18b3f", // brighter to contrast on dark background (used for 'vencemos')
+    amber: "#C68642",  // toffee (accent)
+    rose: "#b63f2b",   // warmer red-brown for contrast (dataset)
     violet: "#73503C", // brownish-violet for subtle contrast
-    slate: "#4A2F2B",  // dark slate brown
+    slate: "#4A2F2B",  // dark slate brown (borders)
     grid: "#efe6df",   // light beige background/grid
-    text: "#3b2b2a",
-    muted: "#6d4c41"
+    // UI text colors adjusted for dark background: use light/beige tones for better contrast
+    text: "#f3e2cc",   // primary light text color for labels and percentages
+    muted: "#e5c9ac"   // secondary muted text for ticks and helper text
 }
 
 const emptyStatePlugin = {
@@ -251,9 +252,9 @@ function baseOptions() {
                 display: false
             },
             tooltip: {
-                backgroundColor: "#0f172a",
+            backgroundColor: "#1f1a17",
                 titleColor: "#ffffff",
-                bodyColor: "#e2e8f0",
+            bodyColor: CHART_COLORS.text,
                 padding: 12,
                 cornerRadius: 6,
                 displayColors: false,
