@@ -725,8 +725,11 @@ function createChannelsChart(data) {
 
     destroyChart(channelsChart)
 
+    // Exclui movimentos de "Troca de Titularidade" dos canais
+    const filteredData = data.filter(item => !isOwnershipTransferChannel(item))
+
     const entries =
-        getSplitStatusEntries(data, COLUMN_MAP.canal, 8)
+        getSplitStatusEntries(filteredData, COLUMN_MAP.canal, 8)
 
     if (!hasSplitComparisonData(entries)) {
         toggleChartCard("channelsChartCard", false)
@@ -740,7 +743,7 @@ function createChannelsChart(data) {
         entries,
         (label, statusType) => openChartRows(
             `Canal: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
-            rowsMatchingChartStatus(data, COLUMN_MAP.canal, label, statusType)
+            rowsMatchingChartStatus(filteredData, COLUMN_MAP.canal, label, statusType)
         )
     )
 }
@@ -1011,11 +1014,14 @@ function createInstallationChart(data) {
 
     destroyChart(installationChart)
 
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
+    // Exclui "Troca de Titularidade" das taxas
+    const wonOnly = data
+        .filter(item =>
+            STATUS.won.includes(
+                normalize(item[COLUMN_MAP.status])
+            )
         )
-    )
+        .filter(item => !isOwnershipTransferChannel(item))
 
     let paid = 0
     let free = 0
@@ -1063,19 +1069,21 @@ function createInstallationChart(data) {
                 ...baseOptions(),
                 cutout: "68%",
                 onClick(event, elements) {
-                    if (!elements.length || typeof openProspectList !== "function") {
-                        return
-                    }
+                    if (!elements.length) return
 
-                    const index =
-                        elements[0].index
+                    const index = elements[0].index
 
-                    openProspectList(
-                        index === 0
-                            ? "installationPaid"
-                            : "installationFree"
+                    const rows = wonOnly.filter(item => {
+                        const hasTax = parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]) > 0
+                        return index === 0 ? hasTax : !hasTax
+                    })
+
+                    openChartRows(
+                        index === 0 ? "Taxa paga" : "Taxa isenta",
+                        rows
                     )
                 },
+
                 onHover(event, elements) {
                     event.native.target.style.cursor =
                         elements.length ? "pointer" : "default"
