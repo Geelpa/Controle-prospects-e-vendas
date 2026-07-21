@@ -151,12 +151,7 @@ const stackedBarValueLabelsPlugin = {
                 const labelText = `${total} (${percent}%)`;
 
                 // Desenha o texto com segurança, posicionando após a borda direita da barra
-                ctx.fillText(
-                    labelText,
-                    bar.x + 8,
-                    bar.y
-                );
-                );
+                ctx.fillText(labelText, bar.x + 8, bar.y);
             });
         }
 
