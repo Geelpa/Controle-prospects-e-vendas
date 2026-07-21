@@ -44,7 +44,7 @@
         body button:focus {
             outline: 2px solid #c68642 !important;
             outline-offset: 2px !important;
-            box-shadow: 0 0 0 4px rgba(198,104,66,0.12) !important;
+            box-shadow: 0 0 0 4px rgba(198, 104, 66, 0.12) !important;
         }
 
         /* File input tweaks to inherit theme */
@@ -134,24 +134,6 @@
         </div>
 
         <div id="dashboardContent" class="hidden">
-            <!-- RANKING -->
-            <!-- <div class="bg-green-600 rounded-lg p-3 shadow-sm mb-4">
-                <div class="flex items-center justify-between gap-3 mb-3">
-                    <div>
-                        <p class="text-[11px] font-semibold text-white uppercase tracking-wide">
-                            Destaques do período
-                        </p>
-                        <h3 class="text-base font-semibold text-white">
-                            Melhores Rankings
-                        </h3>
-                    </div>
-                    <span class="text-[14px] font-semibold text-amber-950 bg-yellow-300 rounded px-2 py-1">
-                        Top 3
-                    </span>
-                </div>
-
-                <div id="bestPodiumList" class="grid grid-cols-1 md:grid-cols-3 gap-2"></div>
-            </div> -->
             <!-- FILTROS -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
 
@@ -218,7 +200,7 @@
                 <div data-drilldown="inProgress" role="button" tabindex="0"
                     class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-[#fff] uppercase tracking-wide">
                         Em Andamento
                     </p>
 
@@ -231,7 +213,7 @@
                 <div data-drilldown="won" role="button" tabindex="0"
                     class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-green-500 uppercase tracking-wide">
                         Vencemos
                     </p>
 
@@ -245,7 +227,7 @@
                 <div data-drilldown="lost" role="button" tabindex="0"
                     class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-red-500 uppercase tracking-wide">
                         Perdemos
                     </p>
 
@@ -258,7 +240,7 @@
                 <div data-drilldown="noViability" role="button" tabindex="0"
                     class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-grey-200 uppercase tracking-wide">
                         Sem Viabilidade
                     </p>
 
@@ -272,7 +254,7 @@
 
                 <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-blue-300 uppercase tracking-wide">
                         Conversão
                     </p>
 
@@ -283,7 +265,7 @@
                 </div>
                 <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-orange-400 uppercase tracking-wide">
                         taxas (R$)
                     </p>
 
@@ -294,7 +276,7 @@
                 </div>
                 <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm">
 
-                    <p class="text-xs font-semibold text-[#e5c9ac] uppercase tracking-wide">
+                    <p class="text-xs font-semibold text-green-400 uppercase tracking-wide">
                         Ticket Médio (R$)
                     </p>
 
@@ -417,10 +399,11 @@
     </div>
 
     <div id="prospectModal" class="hidden fixed inset-0 z-50 bg-[#00000080] p-4">
-        <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg shadow-xl max-w-8xl m-auto max-h-[90vh] flex flex-col">
+        <div
+            class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg shadow-xl max-w-8xl m-auto max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between gap-4 border-b border-[#6b4f3f] px-5 py-4">
                 <div>
-                    <h2 id="prospectModalTitle" class="text-lg font-semibold text-[#f3e2cc]">
+                    <h2 id="prospectModalTitle" class="text-lg font-semibold text-slate-500">
                         Prospects
                     </h2>
                     <p id="prospectModalCount" class="text-sm text-[#e5c9ac]">
