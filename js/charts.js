@@ -1,14 +1,52 @@
 const CHART_COLORS = {
-    blue: "#6B4C3B",   // chocolate brown
-    cyan: "#A67C52",   // caramel
-    emerald: "#8B5E3C", // milk chocolate (used for 'vencemos')
-    amber: "#C68642",  // toffee
-    rose: "#5C2E2E",   // deep brown
+    blue: "#6B4C3B",   // chocolate brown (dataset)
+    cyan: "#A67C52",   // caramel (dataset)
+    emerald: "#d18b3f", // brighter to contrast on dark background (used for 'vencemos')
+    amber: "#C68642",  // toffee (accent)
+    rose: "#b63f2b",   // warmer red-brown for contrast (dataset)
     violet: "#73503C", // brownish-violet for subtle contrast
-    slate: "#4A2F2B",  // dark slate brown
+    slate: "#4A2F2B",  // dark slate brown (borders)
     grid: "#efe6df",   // light beige background/grid
-    text: "#3b2b2a",
-    muted: "#6d4c41"
+    // UI text colors adjusted for dark background: use light/beige tones for better contrast
+    text: "#f3e2cc",   // primary light text color for labels and percentages
+    muted: "#e5c9ac"   // secondary muted text for ticks and helper text
+}
+
+// Helpers to compute appropriate label color (white or dark) depending on background color luminance
+function hexToRgb(hex) {
+    if (!hex) return null
+    hex = hex.replace('#', '')
+    if (hex.length === 3) {
+        hex = hex.split('').map(h => h + h).join('')
+    }
+    const int = parseInt(hex, 16)
+    return { r: (int >> 16) & 255, g: (int >> 8) & 255, b: int & 255 }
+}
+
+function rgbaStringToRgb(rgba) {
+    const m = rgba.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/)
+    if (!m) return null
+    return { r: Number(m[1]), g: Number(m[2]), b: Number(m[3]) }
+}
+
+function getRgbFromColorString(color) {
+    if (!color) return null
+    if (color.startsWith('#')) return hexToRgb(color)
+    if (color.startsWith('rgb')) return rgbaStringToRgb(color)
+    return null
+}
+
+function getContrastingTextColor(backgroundColor) {
+    const rgb = getRgbFromColorString(backgroundColor)
+    if (!rgb) return '#ffffff'
+    // relative luminance formula
+    const srgb = [rgb.r, rgb.g, rgb.b].map(v => {
+        const s = v / 255
+        return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    })
+    const lum = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2]
+    // contrast threshold: if background is dark (lum < 0.5) use white, otherwise use dark brown
+    return lum < 0.5 ? '#ffffff' : '#2b1e18'
 }
 
 const emptyStatePlugin = {
@@ -121,7 +159,11 @@ const stackedBarValueLabelsPlugin = {
                 if (width < 32) return
 
                 ctx.textAlign = "center"
-                ctx.fillStyle = "#ffffff"
+                // determine the dataset/bar color to pick a readable label color
+                const datasetColor = Array.isArray(dataset.backgroundColor)
+                    ? dataset.backgroundColor[index]
+                    : dataset.backgroundColor || dataset.borderColor
+                ctx.fillStyle = getContrastingTextColor(datasetColor)
                 ctx.fillText(
                     value,
                     bar.base + ((bar.x - bar.base) / 2),
@@ -132,7 +174,8 @@ const stackedBarValueLabelsPlugin = {
 
         const lastDataset = datasets[datasets.length - 1];
         const lastMeta = chart.getDatasetMeta(datasets.length - 1);
-        // Calcula o total geral para obter porcentagens relativas entre as barras        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
+        // Calcula o total geral para obter porcentagens relativas entre as barras
+        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
 
         // Garante que o meta e os dados da barra existem antes de rodar o loop
 
@@ -184,7 +227,6 @@ const doughnutValueLabelsPlugin = {
 
         ctx.save()
         ctx.font = "700 12px Inter, system-ui, sans-serif"
-        ctx.fillStyle = "#ffffff"
         ctx.textAlign = "center"
         ctx.textBaseline = "middle"
 
@@ -194,6 +236,12 @@ const doughnutValueLabelsPlugin = {
                 ((value / total) * 100).toFixed(1)
             const position =
                 arc.tooltipPosition()
+
+            // pick contrasting text color based on arc background color
+            const arcColor = Array.isArray(dataset.backgroundColor)
+                ? dataset.backgroundColor[index]
+                : dataset.backgroundColor
+            ctx.fillStyle = getContrastingTextColor(arcColor)
 
             ctx.fillText(
                 `${value} (${percent}%)`,
@@ -250,9 +298,9 @@ function baseOptions() {
                 display: false
             },
             tooltip: {
-                backgroundColor: "#0f172a",
+            backgroundColor: "#1f1a17",
                 titleColor: "#ffffff",
-                bodyColor: "#e2e8f0",
+            bodyColor: CHART_COLORS.text,
                 padding: 12,
                 cornerRadius: 6,
                 displayColors: false,
