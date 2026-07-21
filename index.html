@@ -56,6 +56,65 @@
             margin-right: 0.4rem;
             border-radius: 0.375rem;
         }
+
+        /* Modal-specific styles to match the brown theme */
+        #prospectModal {
+            backdrop-filter: blur(4px);
+        }
+
+        #prospectModal > div {
+            background-color: #443027 !important;
+            border: 1px solid #6b4f3f !important;
+            color: #f3e2cc !important;
+        }
+
+        /* Header area inside modal */
+        #prospectModal .border-b {
+            border-color: #6b4f3f !important;
+            background: linear-gradient(180deg, rgba(107,79,63,0.06), transparent);
+        }
+
+        #prospectModal .text-sm,
+        #prospectModal p,
+        #prospectModal h2 {
+            color: #f3e2cc !important;
+        }
+
+        /* Table inside modal */
+        #prospectModal table {
+            color: #e5c9ac;
+        }
+
+        #prospectModal thead tr {
+            background-color: #5a3e2d !important;
+            color: #f3e2cc !important;
+        }
+
+        #prospectModal tbody tr {
+            border-bottom: 1px solid #6b4f3f;
+        }
+
+        /* Scrollbar inside modal (WebKit) */
+        #prospectModal .overflow-auto::-webkit-scrollbar {
+            height: 10px;
+            width: 10px;
+        }
+        #prospectModal .overflow-auto::-webkit-scrollbar-thumb {
+            background: #6b4f3f;
+            border-radius: 8px;
+        }
+        #prospectModal .overflow-auto::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.02);
+            border-radius: 8px;
+        }
+
+        /* Modal action buttons */
+        #prospectModal button {
+            background: #6b4f3f !important;
+            color: #f3e2cc !important;
+            border: 1px solid #6b4f3f !important;
+        }
+
     </style>
 
     <!-- Papa Parse -->
