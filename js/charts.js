@@ -132,6 +132,9 @@ const stackedBarValueLabelsPlugin = {
 
         const lastDataset = datasets[datasets.length - 1];
         const lastMeta = chart.getDatasetMeta(datasets.length - 1);
+        // Calcula o total geral para obter porcentagens relativas entre as barras        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
+
+        // Garante que o meta e os dados da barra existem antes de rodar o loop
 
         if (lastMeta && lastMeta.data) {
             lastMeta.data.forEach((bar, index) => {
@@ -143,11 +146,16 @@ const stackedBarValueLabelsPlugin = {
                 ctx.textAlign = "left";
                 ctx.fillStyle = CHART_COLORS.text;
 
-                // Desenha o texto com segurança
+                // Texto com total e porcentagem relativa ao total geral (sem casas decimais)
+                const percent = grandTotal ? Math.round((Number(total) / grandTotal) * 100) : 0;
+                const labelText = `${total} (${percent}%)`;
+
+                // Desenha o texto com segurança, posicionando após a borda direita da barra
                 ctx.fillText(
-                    `Total ${total}`,
+                    labelText,
                     bar.x + 8,
                     bar.y
+                );
                 );
             });
         }
@@ -1077,6 +1085,19 @@ function createInstallationChart(data) {
                         return index === 0 ? hasTax : !hasTax
                     })
 
+                    // Abre o modal passando explicitamente para esconder o campo de motivo
+                    if (typeof openProspectListForRows === "function") {
+                        openProspectListForRows(
+                            index === 0 ? "Taxa paga" : "Taxa isenta",
+                            rows,
+                            { hiddenColumns: [COLUMN_MAP.motivoPerda, "Motivo", "Motivo de Perda"] }
+                        )
+                    } else {
+                        openChartRows(
+                            index === 0 ? "Taxa paga" : "Taxa isenta",
+                            rows
+                        )
+                    }
                     openChartRows(
                         index === 0 ? "Taxa paga" : "Taxa isenta",
                         rows
