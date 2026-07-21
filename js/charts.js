@@ -156,7 +156,6 @@ const stackedBarValueLabelsPlugin = {
                     bar.x + 8,
                     bar.y
                 );
-                );
             });
         }
 
