@@ -132,7 +132,8 @@ const stackedBarValueLabelsPlugin = {
 
         const lastDataset = datasets[datasets.length - 1];
         const lastMeta = chart.getDatasetMeta(datasets.length - 1);
-        // Calcula o total geral para obter porcentagens relativas entre as barras        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
+        // Calcula o total geral para obter porcentagens relativas entre as barras
+        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
 
         // Garante que o meta e os dados da barra existem antes de rodar o loop
 
