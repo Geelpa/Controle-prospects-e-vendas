@@ -235,7 +235,7 @@ function renderProspectTable(rows, options = {}) {
     // 4. Desenha os cabeçalhos das colunas que sobraram
     columns.forEach(column => {
         const cell = document.createElement("th")
-        cell.className = "p-4 text-left text-slate-800 whitespace-normal "
+        cell.className = "p-4 text-left text-white whitespace-normal "
         cell.textContent = getColumnLabel(column)
         header.appendChild(cell)
     })
@@ -243,7 +243,7 @@ function renderProspectTable(rows, options = {}) {
     // 5. Desenha as linhas da tabela
     rows.forEach(row => {
         const line = document.createElement("tr")
-        line.className = "hover:bg-slate-50"
+        line.className = "hover:bg-yellow-900"
 
         columns.forEach(column => {
             const cell = document.createElement("td")
