@@ -334,7 +334,8 @@ function renderProspectTable(rows, options = {}) {
 
     const currentTitle = modalTitleElement ? modalTitleElement.textContent.toLowerCase() : "";
     const hiddenColumns = options.hiddenColumns || [];
-n    // Se todas as linhas apresentadas são vendas (vencemos), esconde o Motivo de Perda
+
+    // Se todas as linhas apresentadas são vendas (vencemos), esconde o Motivo de Perda
     const allWon = rows.length > 0 && rows.every(item => STATUS.won.includes(normalize(item[COLUMN_MAP.status])));
     if (allWon) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda);
