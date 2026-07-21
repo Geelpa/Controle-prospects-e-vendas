@@ -334,8 +334,15 @@ function renderProspectTable(rows, options = {}) {
 
     const currentTitle = modalTitleElement ? modalTitleElement.textContent.toLowerCase() : "";
     const hiddenColumns = options.hiddenColumns || [];
+n    // Se todas as linhas apresentadas são vendas (vencemos), esconde o Motivo de Perda
+    const allWon = rows.length > 0 && rows.every(item => STATUS.won.includes(normalize(item[COLUMN_MAP.status])));
+    if (allWon) {
+        hiddenColumns.push(COLUMN_MAP.motivoPerda);
+        hiddenColumns.push("Motivo");
+        hiddenColumns.push("Motivo de Perda");
+    }
 
-    // REGRA SIMPLIFICADA 1: Se o título tem "venc", esconde o Motivo de Perda
+    // REGRA SIMPLIFICADA 1: Se o título tem "venc", esconde o Motivo de Perda (compatibilidade retroativa)
     if (currentTitle.includes("venc")) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda);
         hiddenColumns.push("Motivo");
