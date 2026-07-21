@@ -133,7 +133,6 @@ const stackedBarValueLabelsPlugin = {
         const lastDataset = datasets[datasets.length - 1];
         const lastMeta = chart.getDatasetMeta(datasets.length - 1);
 
-        // Garante que o meta e os dados da barra existem antes de rodar o loop
         if (lastMeta && lastMeta.data) {
             lastMeta.data.forEach((bar, index) => {
                 const total = totals ? totals[index] : null;
