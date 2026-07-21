@@ -1,14 +1,14 @@
 const CHART_COLORS = {
-    blue: "#2563eb",
-    cyan: "#0891b2",
-    emerald: "#059646",
-    amber: "#c46f0f",
-    rose: "#f50808",
-    violet: "#7c3aed",
-    slate: "#475569",
-    grid: "#e2e8f0",
-    text: "#334155",
-    muted: "#64748b"
+    blue: "#6B4C3B",   // chocolate brown
+    cyan: "#A67C52",   // caramel
+    emerald: "#8B5E3C", // milk chocolate (used for 'vencemos')
+    amber: "#C68642",  // toffee
+    rose: "#5C2E2E",   // deep brown
+    violet: "#73503C", // brownish-violet for subtle contrast
+    slate: "#4A2F2B",  // dark slate brown
+    grid: "#efe6df",   // light beige background/grid
+    text: "#3b2b2a",
+    muted: "#6d4c41"
 }
 
 const emptyStatePlugin = {
