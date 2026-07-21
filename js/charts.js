@@ -1,7 +1,7 @@
 const CHART_COLORS = {
-    blue: "#6B4C3B",   // chocolate brown (dataset)
+    blue: "#bd6a3e",   // chocolate brown (dataset)
     cyan: "#A67C52",   // caramel (dataset)
-    emerald: "#d18b3f", // brighter to contrast on dark background (used for 'vencemos')
+    emerald: "#26ad14", // brighter to contrast on dark background (used for 'vencemos')
     amber: "#C68642",  // toffee (accent)
     rose: "#b63f2b",   // warmer red-brown for contrast (dataset)
     violet: "#73503C", // brownish-violet for subtle contrast
@@ -298,9 +298,9 @@ function baseOptions() {
                 display: false
             },
             tooltip: {
-            backgroundColor: "#1f1a17",
+                backgroundColor: "#1f1a17",
                 titleColor: "#ffffff",
-            bodyColor: CHART_COLORS.text,
+                bodyColor: CHART_COLORS.text,
                 padding: 12,
                 cornerRadius: 6,
                 displayColors: false,
