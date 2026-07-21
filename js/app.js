@@ -279,7 +279,7 @@ function renderPodiumList(containerId, items) {
         // Textos internos
         title.className = "text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1";
         label.className = "text-[15px] font-bold text-white truncate leading-tight tracking-tight mb-0.5";
-        value.className = "text-xs font-semibold text-emerald-400 leading-none flex items-center gap-1";
+        value.className = "text-xs font-semibold text-orange-400 leading-none flex items-center gap-1";
 
         rank.textContent = "1º";
         title.textContent = item.title;
@@ -377,7 +377,7 @@ function renderProspectTable(rows, options = {}) {
     // Cria as tags th do Cabeçalho
     columns.forEach(column => {
         const cell = document.createElement("th");
-        cell.className = "p-4 text-left text-slate-800 whitespace-normal";
+        cell.className = "p-4 text-left text-white whitespace-normal";
         cell.textContent = getColumnLabel(column);
         header.appendChild(cell);
     });
@@ -385,11 +385,11 @@ function renderProspectTable(rows, options = {}) {
     // Cria as tags td das Linhas
     rows.forEach(row => {
         const line = document.createElement("tr");
-        line.className = "hover:bg-slate-50";
+        line.className = "hover:bg-orange-300";
 
         columns.forEach(column => {
             const cell = document.createElement("td");
-            cell.className = "p-2 text-slate-600 border border-slate-300";
+            cell.className = "p-2 text-white border border-yellow-500";
             cell.textContent = formatListValue(column, row[column]);
             line.appendChild(cell);
         });
