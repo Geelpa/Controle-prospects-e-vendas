@@ -3,7 +3,7 @@ const CHART_COLORS = {
     cyan: "#A67C52",   // caramel (dataset)
     emerald: "#26ad14", // brighter to contrast on dark background (used for 'vencemos')
     amber: "#C68642",  // toffee (accent)
-    rose: "#b63f2b",   // warmer red-brown for contrast (dataset)
+    rose: "#a02c18",   // warmer red-brown for contrast (dataset)
     violet: "#73503C", // brownish-violet for subtle contrast
     slate: "#4A2F2B",  // dark slate brown (borders)
     grid: "#efe6df",   // light beige background/grid
