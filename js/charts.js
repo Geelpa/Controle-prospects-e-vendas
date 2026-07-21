@@ -1078,10 +1078,19 @@ function createInstallationChart(data) {
                         return index === 0 ? hasTax : !hasTax
                     })
 
-                    openChartRows(
-                        index === 0 ? "Taxa paga" : "Taxa isenta",
-                        rows
-                    )
+                    // Abre o modal passando explicitamente para esconder o campo de motivo
+                    if (typeof openProspectListForRows === "function") {
+                        openProspectListForRows(
+                            index === 0 ? "Taxa paga" : "Taxa isenta",
+                            rows,
+                            { hiddenColumns: [COLUMN_MAP.motivoPerda, "Motivo", "Motivo de Perda"] }
+                        )
+                    } else {
+                        openChartRows(
+                            index === 0 ? "Taxa paga" : "Taxa isenta",
+                            rows
+                        )
+                    }
                 },
 
                 onHover(event, elements) {
