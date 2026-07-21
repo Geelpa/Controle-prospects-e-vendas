@@ -132,6 +132,8 @@ const stackedBarValueLabelsPlugin = {
 
         const lastDataset = datasets[datasets.length - 1];
         const lastMeta = chart.getDatasetMeta(datasets.length - 1);
+n        // Calcula o total geral para obter porcentagens relativas entre as barras
+        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
 
         // Garante que o meta e os dados da barra existem antes de rodar o loop
         if (lastMeta && lastMeta.data) {
@@ -144,9 +146,13 @@ const stackedBarValueLabelsPlugin = {
                 ctx.textAlign = "left";
                 ctx.fillStyle = CHART_COLORS.text;
 
-                // Desenha o texto com segurança
+                // Texto com total e porcentagem relativa ao total geral
+                const percent = grandTotal ? ((Number(total) / grandTotal) * 100).toFixed(1) : "0.0";
+                const labelText = `${total} (${percent}%)`;
+
+                // Desenha o texto com segurança, posicionando após a borda direita da barra
                 ctx.fillText(
-                    `Total ${total}`,
+                    labelText,
                     bar.x + 8,
                     bar.y
                 );
