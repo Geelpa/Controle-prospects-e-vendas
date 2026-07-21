@@ -153,11 +153,9 @@ const stackedBarValueLabelsPlugin = {
                 // Desenha o texto com segurança, posicionando após a borda direita da barra
                 ctx.fillText(
                     labelText,
-                // Desenha o texto com segurança
-                ctx.fillText(
-                    `Total ${total}`,
                     bar.x + 8,
                     bar.y
+                );
                 );
             });
         }
