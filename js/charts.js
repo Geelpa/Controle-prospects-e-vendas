@@ -146,8 +146,8 @@ const stackedBarValueLabelsPlugin = {
                 ctx.textAlign = "left";
                 ctx.fillStyle = CHART_COLORS.text;
 
-                // Texto com total e porcentagem relativa ao total geral
-                const percent = grandTotal ? ((Number(total) / grandTotal) * 100).toFixed(1) : "0.0";
+                // Texto com total e porcentagem relativa ao total geral (sem casas decimais)
+                const percent = grandTotal ? Math.round((Number(total) / grandTotal) * 100) : 0;
                 const labelText = `${total} (${percent}%)`;
 
                 // Desenha o texto com segurança, posicionando após a borda direita da barra
