@@ -135,6 +135,7 @@ const stackedBarValueLabelsPlugin = {
         // Calcula o total geral para obter porcentagens relativas entre as barras        const grandTotal = totals.reduce((sum, t) => sum + (Number(t) || 0), 0) || 0;
 
         // Garante que o meta e os dados da barra existem antes de rodar o loop
+
         if (lastMeta && lastMeta.data) {
             lastMeta.data.forEach((bar, index) => {
                 const total = totals ? totals[index] : null;
@@ -152,6 +153,9 @@ const stackedBarValueLabelsPlugin = {
                 // Desenha o texto com segurança, posicionando após a borda direita da barra
                 ctx.fillText(
                     labelText,
+                // Desenha o texto com segurança
+                ctx.fillText(
+                    `Total ${total}`,
                     bar.x + 8,
                     bar.y
                 );
@@ -1096,6 +1100,10 @@ function createInstallationChart(data) {
                             rows
                         )
                     }
+                    openChartRows(
+                        index === 0 ? "Taxa paga" : "Taxa isenta",
+                        rows
+                    )
                 },
 
                 onHover(event, elements) {
