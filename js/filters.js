@@ -73,6 +73,14 @@ function populateMonthFilter(data) {
 
         monthFilter.appendChild(option)
     })
+
+    // Seleciona por padrão o mês atual se estiver presente nos dados
+    const currentMonth = new Date().getMonth() + 1
+    if (months.includes(currentMonth)) {
+        monthFilter.value = String(currentMonth)
+    } else {
+        monthFilter.value = "all"
+    }
 }
 
 function populateYearFilter(data) {
@@ -114,6 +122,14 @@ function populateYearFilter(data) {
 
         yearFilter.appendChild(option)
     })
+
+    // Seleciona por padrão o ano atual se presente nos dados
+    const currentYear = new Date().getFullYear()
+    if (years.includes(currentYear)) {
+        yearFilter.value = String(currentYear)
+    } else {
+        yearFilter.value = "all"
+    }
 }
 
 function applyFilters() {
