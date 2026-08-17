@@ -38,22 +38,36 @@ function processData(data) {
     currentFilteredData = prospectsData;
     const totalProspects = prospectsData.length;
 
-    // A contagem usa a inteligência de dupla checagem direta do arquivo
+    // VENCEMOS: conforme nova regra, precisa ter status 'vencemos' E contrato ativo com plano descrito e valor > 0
     const won = prospectsData.filter(isWon).length;
 
+    // PERDEMOS: apenas status 'perdemos'
     const lost = prospectsData.filter(item =>
-        !isWon(item) && STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
+        STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
+    // SEM VIABILIDADE: apenas status 'sem viabilidade'
     const noViability = prospectsData.filter(item =>
-        !isWon(item) && STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
+        STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
-    const inProgress = prospectsData.filter(item =>
-        !isWon(item) && STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
-    ).length;
+    // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
+    const inProgress = prospectsData.filter(item => {
+        const s = normalize(item[COLUMN_MAP.status]);
+        return (
+            !STATUS.won.includes(s) &&
+            !STATUS.lost.includes(s) &&
+            !STATUS.noViability.includes(s) &&
+            s !== "abortamos"
+        )
+    }).length;
 
-    const workableSales = prospectsData.filter(isWorkableSaleStatus).length;
+    // Oportunidades trabalhadas: apenas aqueles com status 'vencemos' ou 'perdemos'
+    const workableSales = prospectsData.filter(item => {
+        const s = normalize(item[COLUMN_MAP.status]);
+        return STATUS.won.includes(s) || STATUS.lost.includes(s);
+    }).length;
+
     const safeWorkableSales = workableSales < won ? won : workableSales;
 
     const conversion =
@@ -69,7 +83,8 @@ function processData(data) {
     let totalTaxRevenue = 0;
     let validContractCount = 0;
 
-    const wonOnly = data.filter(isWon);
+    // Para manter coerência, os financeiros consideram apenas os prospects válidos (mesma base usada nos KPIs)
+    const wonOnly = prospectsData.filter(isWon);
 
     wonOnly.forEach(item => {
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
@@ -427,8 +442,8 @@ function renderProspectTable(rows, options = {}) {
     const currentTitle = modalTitleElement ? modalTitleElement.textContent.toLowerCase() : "";
     const hiddenColumns = options.hiddenColumns || [];
 
-    // Se todas as linhas apresentadas são vendas (vencemos), esconde o Motivo de Perda
-    const allWon = rows.length > 0 && rows.every(item => STATUS.won.includes(normalize(item[COLUMN_MAP.status])));
+    // Se todas as linhas apresentadas são vendas (vencemos) segundo a regra (isWon), esconde o Motivo de Perda
+    const allWon = rows.length > 0 && rows.every(item => isWon(item));
     if (allWon) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda);
         hiddenColumns.push("Motivo");

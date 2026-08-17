@@ -7,7 +7,7 @@ const COLUMN_MAP = {
     id: "ID",
     razao: "Razão",
     canal: "Canal de venda",
-    campanha: "Campanha de venda",
+    campanha: "Campanha",
     vendedor: "Vendedor",
     status: "Status",
     motivoPerda: "Motivo perdemos",
