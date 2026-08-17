@@ -877,7 +877,7 @@ function createSalesPerDayChart(data) {
     wonOnly.forEach(item => {
 
         const parsedDate =
-            extractBestDate(item)
+            extractActivationDate(item)
 
         if (!parsedDate) return
 
@@ -916,7 +916,7 @@ function createSalesPerDayChart(data) {
                 labels,
 
                 datasets: [{
-                    label: "Vendas",
+                    label: "Ativações",
                     data: values,
                     tension: 0.35,
                     fill: true,
@@ -943,13 +943,13 @@ function createSalesPerDayChart(data) {
 
                     const rows = wonOnly.filter(item => {
                         const parsedDate =
-                            extractBestDate(item)
+                            extractActivationDate(item)
 
                         return parsedDate && getSalesDateKey(parsedDate) === key
                     })
 
                     openChartRows(
-                        `Vendas em ${formatSalesDateLabel(key)}`,
+                        `Ativações em ${formatSalesDateLabel(key)}`,
                         rows
                     )
                 },
@@ -964,7 +964,7 @@ function createSalesPerDayChart(data) {
                         ...baseOptions().plugins.tooltip,
                         callbacks: {
                             label(context) {
-                                return `Vendas: ${context.parsed.y}`
+                                return `Ativações: ${context.parsed.y}`
                             }
                         }
                     }

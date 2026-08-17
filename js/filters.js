@@ -48,7 +48,7 @@ function populateMonthFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        extractBestDate(item)
+                        extractRegistrationDate(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -99,7 +99,7 @@ function populateYearFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        extractBestDate(item)
+                        extractRegistrationDate(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -156,7 +156,7 @@ function applyFilters() {
 
         // DATA
         const parsedDate =
-            extractBestDate(item)
+            extractRegistrationDate(item)
 
         // IGNORA DATAS INVÁLIDAS
         if (!parsedDate) return false
@@ -220,7 +220,7 @@ function updateSalesChartFilters(data, selectedMonth) {
         weekFilter.value = "all"
 
         if (salesChartTitle) {
-            salesChartTitle.textContent = "Vendas por Mês"
+            salesChartTitle.textContent = "Ativações por Mês"
         }
 
         return
@@ -237,7 +237,7 @@ function updateSalesChartFilters(data, selectedMonth) {
         weekFilter.value = "all"
 
         if (salesChartTitle) {
-            salesChartTitle.textContent = "Vendas por Mês"
+            salesChartTitle.textContent = "Ativações por Mês"
         }
 
         return
@@ -249,8 +249,8 @@ function updateSalesChartFilters(data, selectedMonth) {
     if (salesChartTitle) {
         salesChartTitle.textContent =
             weekFilter.value === "all"
-                ? "Vendas por Semana"
-                : "Vendas por Dia"
+                ? "Ativações por Semana"
+                : "Ativações por Dia"
     }
 }
 
@@ -274,7 +274,7 @@ function populateWeekFilter(data) {
                 )
                 .map(item => {
                     const parsedDate =
-                        extractBestDate(item)
+                        extractActivationDate(item)
 
                     if (!parsedDate) return null
 

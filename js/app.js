@@ -113,6 +113,8 @@ function processData(data) {
         totalTaxPaid: formattedTaxRevenue
     });
 
+    logDashboardAudit(data, prospectsData, isNewProspect);
+
     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
@@ -143,6 +145,114 @@ function processData(data) {
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(prospectsData);
     if (typeof createInstallationChart === "function") createInstallationChart(prospectsData);
     if (typeof createPlansChart === "function") createPlansChart(prospectsData);
+}
+
+function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
+    const statusCounts = countBy(filteredRows, item =>
+        normalize(item[COLUMN_MAP.status]) || "(sem status)"
+    );
+
+    const prospectStatusCounts = countBy(prospectsRows, item =>
+        normalize(item[COLUMN_MAP.status]) || "(sem status)"
+    );
+
+    const strictWonRows = prospectsRows.filter(item =>
+        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const computedWonRows = prospectsRows.filter(isWon);
+
+    const financialOnlyWonRows = computedWonRows.filter(item =>
+        !STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const lostRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const noViabilityRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const inProgressRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const additionalRows = filteredRows.filter(item =>
+        !isNewProspect(item)
+    );
+
+    const duplicateIdReport =
+        getDuplicateIdReport(prospectsRows);
+
+    const report = {
+        linhasAposFiltrosCadastro: filteredRows.length,
+        prospectsContadosNoDashboard: prospectsRows.length,
+        removidosPorRegraAdicional: additionalRows.length,
+        prospectsUnicosPorId: duplicateIdReport.uniqueCount,
+        idsDuplicados: duplicateIdReport.duplicateIdCount,
+        linhasDuplicadasPorId: duplicateIdReport.duplicateRowCount,
+        vencemosPorStatus: strictWonRows.length,
+        vencemosRegraAtual: computedWonRows.length,
+        vencemosSomentePorContratoValor: financialOnlyWonRows.length,
+        perdemosRegraAtual: lostRows.length,
+        semViabilidadeRegraAtual: noViabilityRows.length,
+        emAndamentoRegraAtual: inProgressRows.length
+    };
+
+    window.dashboardAudit = {
+        report,
+        statusCounts,
+        prospectStatusCounts,
+        additionalRows,
+        financialOnlyWonRows,
+        duplicateIds: duplicateIdReport.duplicates
+    };
+
+    console.group("Auditoria Dashboard Comercial");
+    console.table(report);
+    console.log("Status apos filtros de cadastro:", statusCounts);
+    console.log("Status dos prospects contados:", prospectStatusCounts);
+    console.log("Amostras em window.dashboardAudit");
+    console.groupEnd();
+}
+
+function countBy(rows, getKey) {
+    return rows.reduce((acc, row) => {
+        const key = getKey(row);
+
+        acc[key] = (acc[key] || 0) + 1;
+
+        return acc;
+    }, {});
+}
+
+function getDuplicateIdReport(rows) {
+    const ids = rows
+        .map(row => String(row[COLUMN_MAP.id] || "").trim())
+        .filter(Boolean);
+
+    const counts = ids.reduce((acc, id) => {
+        acc[id] = (acc[id] || 0) + 1;
+
+        return acc;
+    }, {});
+
+    const duplicates = Object.entries(counts)
+        .filter(([_, count]) => count > 1)
+        .map(([id, count]) => ({ id, count }));
+
+    const duplicateRowCount = duplicates.reduce(
+        (sum, item) => sum + item.count,
+        0
+    );
+
+    return {
+        uniqueCount: Object.keys(counts).length,
+        duplicateIdCount: duplicates.length,
+        duplicateRowCount,
+        duplicates
+    };
 }
 
 function renderPodiums(currentData) {
