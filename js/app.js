@@ -131,8 +131,7 @@ function processData(data) {
     // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
         logDashboardAudit(data, prospectsData, isNewProspect);
-    } catch (e) { /** não quebrar a execução */ } cee218c607f0aa5812b571362adb0009c49961ca
-    // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
+    } catch (e) { /** não quebrar a execução */ }     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
     const getSellersName = (item) => {
