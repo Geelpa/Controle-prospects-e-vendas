@@ -69,13 +69,76 @@ function parseDate(dateString) {
     )
 }
 
+function findColumnName(row, columnName, aliases = []) {
+    const candidates = [
+        columnName,
+        ...aliases
+    ].filter(Boolean)
+
+    const columns =
+        Object.keys(row || {})
+
+    return candidates.find(candidate =>
+        columns.includes(candidate)
+    ) || candidates
+        .map(candidate =>
+            columns.find(column =>
+                normalize(column) === normalize(candidate)
+            )
+        )
+        .find(Boolean)
+}
+
+function getField(row, columnName, aliases = []) {
+    const resolvedColumn =
+        findColumnName(row, columnName, aliases)
+
+    return resolvedColumn
+        ? row[resolvedColumn]
+        : undefined
+}
+
+function extractDateFromColumns(row, columnNames) {
+    const parsedDates = columnNames
+        .map(columnName =>
+            parseDate(getField(row, columnName))
+        )
+        .filter(Boolean)
+
+    if (!parsedDates.length) {
+        return null
+    }
+
+    return parsedDates[0]
+}
+
+function extractRegistrationDate(row) {
+    return extractDateFromColumns(row, [
+        COLUMN_MAP.data,
+        "Data do cadastro",
+        "Data cadastro"
+    ])
+}
+
+function extractActivationDate(row) {
+    return extractDateFromColumns(row, [
+        COLUMN_MAP.dataAtivacao,
+        "Data ativação",
+        "Data de ativação",
+        "Data ativacao",
+        "Data de ativacao",
+        "Data Ativação",
+        "Data Ativacao"
+    ])
+}
+
 function groupBy(data, columnName) {
 
     const grouped = {}
 
     data.forEach(item => {
 
-        let key = item[columnName]
+        let key = getField(item, columnName)
 
         if (columnName === COLUMN_MAP.plano) {
             key = key || "Sem plano"
@@ -106,36 +169,6 @@ function groupBy(data, columnName) {
 }
 
 function extractBestDate(row) {
-
-    const possibleDateColumns = Object.keys(row)
-        .filter(key =>
-            normalize(key)
-                .includes("data")
-        )
-
-    if (!possibleDateColumns.length) {
-        return null
-    }
-
-    const validDates = []
-
-    possibleDateColumns.forEach(column => {
-
-        const value = row[column]
-
-        const parsed =
-            parseDate(value)
-
-        if (parsed) {
-            validDates.push(parsed)
-        }
-    })
-
-    if (!validDates.length) {
-        return null
-    }
-
-    validDates.sort((a, b) => b - a)
-
-    return validDates[0]
+    return extractRegistrationDate(row) ||
+        extractActivationDate(row)
 }

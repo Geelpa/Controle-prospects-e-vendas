@@ -36,6 +36,7 @@ const LIST_COLUMN_CANDIDATES = [
     COLUMN_MAP.canal,
     COLUMN_MAP.campanha,
     COLUMN_MAP.data,
+    COLUMN_MAP.dataAtivacao,
     "Data do cadastro",
     "Data de cadastro",
     "Data cadastro",

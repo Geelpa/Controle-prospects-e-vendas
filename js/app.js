@@ -128,98 +128,10 @@ function processData(data) {
         totalTaxPaid: formattedTaxRevenue
     });
 
-    // --- AUDITORIA SIMPLES PARA AJUSTAR DISCREPÂNCIAS COM O IXC ---
-    function auditData(rawRows, filteredRows) {
-        try {
-            const rawCount = rawRows.length || 0;
-            const filteredCount = filteredRows.length || 0;
-
-            function isRowEmpty(item) {
-                return Object.values(item).every(v => v === null || v === undefined || String(v).trim() === "");
-            }
-
-            const emptyRows = rawRows.filter(isRowEmpty).length;
-
-            // Removidos como "adicional" (a diferença entre bruto e filtrado)
-            const removedAsAdditional = rawCount - filteredCount;
-
-            // Dedupe por ID / Contrato / Telefone (na ordem)
-            const dedupeMap = new Map();
-            const deduped = [];
-            filteredRows.forEach(item => {
-                const id = String(item[COLUMN_MAP.id] || "").trim();
-                const contrato = String(item[COLUMN_MAP.contrato] || "").trim();
-                const phone = String(item[COLUMN_MAP.telefone] || "").replace(/\D/g, '');
-                const key = id || contrato || phone || JSON.stringify(item).slice(0, 60);
-                const normalizedKey = normalize(key);
-                if (!dedupeMap.has(normalizedKey)) {
-                    dedupeMap.set(normalizedKey, true);
-                    deduped.push(item);
-                }
-            });
-            const dedupCount = deduped.length;
-
-            // Contagens por status (estrito) e pela regra atual (isWon)
-            const strictWon = filteredRows.filter(item => STATUS.won.includes(normalize(item[COLUMN_MAP.status]))).length;
-            const ruleWon = filteredRows.filter(item => isWon(item)).length;
-
-            const strictLost = filteredRows.filter(item => STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))).length;
-            const strictNoViability = filteredRows.filter(item => STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))).length;
-            const strictInProgress = filteredRows.filter(item => STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))).length;
-
-            const workable = filteredRows.filter(isWorkableSaleStatus).length;
-
-            // Mismatches: linhas onde a regra (isWon) difere do status "vencemos"
-            const mismatches = filteredRows.filter(item => (STATUS.won.includes(normalize(item[COLUMN_MAP.status])) ? true : false) !== Boolean(isWon(item)))
-                .slice(0, 20)
-                .map(item => ({
-                    ID: item[COLUMN_MAP.id],
-                    contrato: item[COLUMN_MAP.contrato],
-                    status: item[COLUMN_MAP.status],
-                    isWon_by_status: STATUS.won.includes(normalize(item[COLUMN_MAP.status])),
-                    isWon_by_rule: Boolean(isWon(item)),
-                    valorContrato: item[COLUMN_MAP.valorContrato]
-                }));
-
-            // Datas: linhas sem data válida ou com formatos inválidos (ajuda a checar filtros por Data do Cadastro)
-            const dateProblems = filteredRows.filter(item => {
-                const date = extractBestDate(item);
-                return !date;
-            }).slice(0, 20).map(item => ({ ID: item[COLUMN_MAP.id], Data: item[COLUMN_MAP.data] }));
-
-            console.groupCollapsed("AUDIT: relatório de importação e filtros (compare com IXC)");
-            console.table({ rawCount, emptyRows, removedAsAdditional, filteredCount, dedupCount, strictWon, ruleWon, strictLost, strictNoViability, strictInProgress, workable });
-            console.log("Amostra de divergências entre status 'vencemos' e regra isWon (máx 20):", mismatches);
-            console.log("Amostra de registros sem data detectável (máx 20):", dateProblems);
-            console.groupEnd();
-
-            return {
-                rawCount,
-                emptyRows,
-                removedAsAdditional,
-                filteredCount,
-                dedupCount,
-                strictWon,
-                ruleWon,
-                strictLost,
-                strictNoViability,
-                strictInProgress,
-                workable,
-                mismatches,
-                dateProblems
-            };
-        } catch (err) {
-            console.error("AUDIT ERROR:", err);
-            return null;
-        }
-    }
-
-    // Executa a auditoria no console para ajudar a diagnosticar diferenças com o IXC
+    // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
-        auditData(data, prospectsData);
-    } catch (e) { /** não quebrar a execução */ }
-
-
+        logDashboardAudit(data, prospectsData, isNewProspect);
+    } catch (e) { /** não quebrar a execução */ } cee218c607f0aa5812b571362adb0009c49961ca
     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
@@ -250,6 +162,114 @@ function processData(data) {
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(prospectsData);
     if (typeof createInstallationChart === "function") createInstallationChart(prospectsData);
     if (typeof createPlansChart === "function") createPlansChart(prospectsData);
+}
+
+function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
+    const statusCounts = countBy(filteredRows, item =>
+        normalize(item[COLUMN_MAP.status]) || "(sem status)"
+    );
+
+    const prospectStatusCounts = countBy(prospectsRows, item =>
+        normalize(item[COLUMN_MAP.status]) || "(sem status)"
+    );
+
+    const strictWonRows = prospectsRows.filter(item =>
+        STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const computedWonRows = prospectsRows.filter(isWon);
+
+    const financialOnlyWonRows = computedWonRows.filter(item =>
+        !STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const lostRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const noViabilityRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const inProgressRows = prospectsRows.filter(item =>
+        !isWon(item) && STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
+    );
+
+    const additionalRows = filteredRows.filter(item =>
+        !isNewProspect(item)
+    );
+
+    const duplicateIdReport =
+        getDuplicateIdReport(prospectsRows);
+
+    const report = {
+        linhasAposFiltrosCadastro: filteredRows.length,
+        prospectsContadosNoDashboard: prospectsRows.length,
+        removidosPorRegraAdicional: additionalRows.length,
+        prospectsUnicosPorId: duplicateIdReport.uniqueCount,
+        idsDuplicados: duplicateIdReport.duplicateIdCount,
+        linhasDuplicadasPorId: duplicateIdReport.duplicateRowCount,
+        vencemosPorStatus: strictWonRows.length,
+        vencemosRegraAtual: computedWonRows.length,
+        vencemosSomentePorContratoValor: financialOnlyWonRows.length,
+        perdemosRegraAtual: lostRows.length,
+        semViabilidadeRegraAtual: noViabilityRows.length,
+        emAndamentoRegraAtual: inProgressRows.length
+    };
+
+    window.dashboardAudit = {
+        report,
+        statusCounts,
+        prospectStatusCounts,
+        additionalRows,
+        financialOnlyWonRows,
+        duplicateIds: duplicateIdReport.duplicates
+    };
+
+    console.group("Auditoria Dashboard Comercial");
+    console.table(report);
+    console.log("Status apos filtros de cadastro:", statusCounts);
+    console.log("Status dos prospects contados:", prospectStatusCounts);
+    console.log("Amostras em window.dashboardAudit");
+    console.groupEnd();
+}
+
+function countBy(rows, getKey) {
+    return rows.reduce((acc, row) => {
+        const key = getKey(row);
+
+        acc[key] = (acc[key] || 0) + 1;
+
+        return acc;
+    }, {});
+}
+
+function getDuplicateIdReport(rows) {
+    const ids = rows
+        .map(row => String(row[COLUMN_MAP.id] || "").trim())
+        .filter(Boolean);
+
+    const counts = ids.reduce((acc, id) => {
+        acc[id] = (acc[id] || 0) + 1;
+
+        return acc;
+    }, {});
+
+    const duplicates = Object.entries(counts)
+        .filter(([_, count]) => count > 1)
+        .map(([id, count]) => ({ id, count }));
+
+    const duplicateRowCount = duplicates.reduce(
+        (sum, item) => sum + item.count,
+        0
+    );
+
+    return {
+        uniqueCount: Object.keys(counts).length,
+        duplicateIdCount: duplicates.length,
+        duplicateRowCount,
+        duplicates
+    };
 }
 
 function renderPodiums(currentData) {

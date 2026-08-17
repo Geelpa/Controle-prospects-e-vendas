@@ -10,12 +10,13 @@ const COLUMN_MAP = {
     campanha: "Campanha",
     vendedor: "Vendedor",
     status: "Status",
-    motivoPerda: "Motivo perdemos",
+    motivoPerda: "Descrição",
     plano: "Plano de venda",
     data: "Data do Cadastro",
+    dataAtivacao: "Data ativação",
     contrato: "Contrato Gerado",
     telefone: "Telefone celular",
-    valorContrato: "Valor do plano",
+    valorContrato: "Valor contrato",
     taxaAtivacao: "Taxa de ativação"
 }
 

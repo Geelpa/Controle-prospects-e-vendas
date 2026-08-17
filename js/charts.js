@@ -1,6 +1,6 @@
 const CHART_COLORS = {
     blue: "#bd6a3e",   // chocolate brown (dataset)
-    cyan: "#A67C52",   // caramel (dataset)
+    cyan: "#6d4d2e",   // caramel (dataset)
     emerald: "#26ad14", // brighter to contrast on dark background (used for 'vencemos')
     amber: "#C68642",  // toffee (accent)
     rose: "#a02c18",   // warmer red-brown for contrast (dataset)
@@ -8,8 +8,8 @@ const CHART_COLORS = {
     slate: "#4A2F2B",  // dark slate brown (borders)
     grid: "#efe6df",   // light beige background/grid
     // UI text colors adjusted for dark background: use light/beige tones for better contrast
-    text: "#f3e2cc",   // primary light text color for labels and percentages
-    muted: "#e5c9ac"   // secondary muted text for ticks and helper text
+    text: "#faf4ec",   // primary light text color for labels and percentages
+    muted: "#eeeeee"   // secondary muted text for ticks and helper text
 }
 
 // Helpers to compute appropriate label color (white or dark) depending on background color luminance
@@ -327,7 +327,7 @@ function horizontalBarOptions() {
                     color: CHART_COLORS.muted
                 },
                 grid: {
-                    color: CHART_COLORS.grid,
+                    color: CHART_COLORS.cyan,
                     drawBorder: false
                 },
                 border: {
@@ -877,7 +877,7 @@ function createSalesPerDayChart(data) {
     wonOnly.forEach(item => {
 
         const parsedDate =
-            extractBestDate(item)
+            extractActivationDate(item)
 
         if (!parsedDate) return
 
@@ -916,7 +916,7 @@ function createSalesPerDayChart(data) {
                 labels,
 
                 datasets: [{
-                    label: "Vendas",
+                    label: "Ativações",
                     data: values,
                     tension: 0.35,
                     fill: true,
@@ -943,13 +943,13 @@ function createSalesPerDayChart(data) {
 
                     const rows = wonOnly.filter(item => {
                         const parsedDate =
-                            extractBestDate(item)
+                            extractActivationDate(item)
 
                         return parsedDate && getSalesDateKey(parsedDate) === key
                     })
 
                     openChartRows(
-                        `Vendas em ${formatSalesDateLabel(key)}`,
+                        `Ativações em ${formatSalesDateLabel(key)}`,
                         rows
                     )
                 },
@@ -964,7 +964,7 @@ function createSalesPerDayChart(data) {
                         ...baseOptions().plugins.tooltip,
                         callbacks: {
                             label(context) {
-                                return `Vendas: ${context.parsed.y}`
+                                return `Ativações: ${context.parsed.y}`
                             }
                         }
                     }
