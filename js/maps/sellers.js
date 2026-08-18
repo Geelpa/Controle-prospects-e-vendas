@@ -1,5 +1,6 @@
 const SELLER_MAP = {
     "48": "Eduardo Lima",
+    "181": "Eduardo Lima",
     "67": "Nicole Gahlern",
     "35": "Jonas Paixão",
     "25": "Lucas Dai Prá",

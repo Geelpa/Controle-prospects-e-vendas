@@ -21,25 +21,30 @@ function processData(data) {
     };
 
     // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base
-    const isNewProspect = (item) => {
+    const isAdditionalPlan = (item) => {
         const plano = normalize(item[COLUMN_MAP.plano] || "");
         const campanha = normalize(item[COLUMN_MAP.campanha] || "");
         const canal = normalize(item[COLUMN_MAP.canal] || "");
-        const invalidTerms = ["adicional"];
 
-        return !invalidTerms.some(term =>
+        return ["adicional"].some(term =>
             plano.includes(term) || campanha.includes(term) || canal.includes(term)
         );
     };
 
+    const isNewProspect = (item) => !isAdditionalPlan(item);
+
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
-    const prospectsData = data.filter(isNewProspect);
-    currentFilteredData = prospectsData;
+    const prospectsData = data.filter(item => isNewProspect(item, COLUMN_MAP));
+    currentFilteredData = data;
+    const currentProspectData = prospectsData;
     const totalProspects = prospectsData.length;
 
-    // VENCEMOS: conforme nova regra, precisa ter status 'vencemos' E contrato ativo com plano descrito e valor > 0
-    const won = prospectsData.filter(isWon).length;
+    // As vendas e ativações devem considerar também adicionais e troca de titularidade,
+    // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
+    const wonRows = getUniqueWonRows(data);
+    const won = wonRows.length;
+    const salesPerformanceRows = wonRows.filter(item => !isOwnershipTransferChannel(item));
 
     // PERDEMOS: apenas status 'perdemos'
     const lost = prospectsData.filter(item =>
@@ -84,7 +89,7 @@ function processData(data) {
     let validContractCount = 0;
 
     // Para manter coerência, os financeiros consideram apenas os prospects válidos (mesma base usada nos KPIs)
-    const wonOnly = prospectsData.filter(isWon);
+    const wonOnly = wonRows;
 
     wonOnly.forEach(item => {
         const price = parseNumber(item[COLUMN_MAP.valorContrato]);
@@ -131,37 +136,34 @@ function processData(data) {
     // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
         logDashboardAudit(data, prospectsData, isNewProspect);
-    } catch (e) { /** não quebrar a execução */ } cee218c607f0aa5812b571362adb0009c49961ca
-    // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
+    } catch (e) { /** não quebrar a execução */ }     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
     const getSellersName = (item) => {
-        const sellerFromContract = item[COLUMN_MAP.vendedorContrato];
+        const sellerFromContract = getContractSellerValue(item);
         if (sellerFromContract && String(sellerFromContract).trim() !== "" && normalize(sellerFromContract) !== "undefined") {
-            return sellerFromContract;
+            return resolveSellerDisplayName(sellerFromContract) || sellerFromContract;
         }
-        return item[COLUMN_MAP.vendedor];
+        return resolveSellerDisplayName(getSellerValue(item)) || getSellerValue(item);
     };
 
-    // Criamos uma função de mapeamento exclusiva e segura para os gráficos que dependem do vendedor
-    const chartDataWithCorrectSellers = prospectsData.map(item => {
-        // Criamos um proxy leve, apenas substituindo a propriedade de texto do vendedor com segurança
-        return {
-            ...item,
-            [COLUMN_MAP.vendedor]: getSellersName(item)
-        };
-    });
+    // Base de desempenho comercial: vendas reais, deduplicadas, com vendedor resolvido.
+    const chartDataWithCorrectSellers = salesPerformanceRows.map(item => ({
+        ...item,
+        [COLUMN_MAP.vendedor]: getSellersName(item)
+    }));
 
-    // Alimentamos os gráficos específicos de Vendedor e Canal com os nomes auditados
+    // Gráficos de desempenho devem seguir a base real de vendas e manter status perdidos/andamento
+    // para comparação; só o canal de venda exclui Troca de Titularidade.
     if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
-    if (typeof createChannelsChart === "function") createChannelsChart(chartDataWithCorrectSellers);
+    if (typeof createPlansChart === "function") createPlansChart(chartDataWithCorrectSellers);
+    if (typeof createInstallationChart === "function") createInstallationChart(chartDataWithCorrectSellers);
+    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(chartDataWithCorrectSellers);
 
-    // Todos os gráficos agora usam somente os prospects válidos filtrados para manter os KPIs e drilldowns consistentes.
-    if (typeof createCampaignsChart === "function") createCampaignsChart(prospectsData);
-    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(prospectsData);
-    if (typeof createLossReasonsChart === "function") createLossReasonsChart(prospectsData);
-    if (typeof createInstallationChart === "function") createInstallationChart(prospectsData);
-    if (typeof createPlansChart === "function") createPlansChart(prospectsData);
+    // Gráficos de funil e comparação de status continuam na base completa filtrada.
+    if (typeof createChannelsChart === "function") createChannelsChart(data);
+    if (typeof createCampaignsChart === "function") createCampaignsChart(data);
+    if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
 }
 
 function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
@@ -227,10 +229,13 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
     };
 
     console.group("Auditoria Dashboard Comercial");
-    console.table(report);
+    console.table(
+        Object.entries(report)
+            .map(([chave, valor]) => ({ chave, valor }))
+    );
     console.log("Status apos filtros de cadastro:", statusCounts);
     console.log("Status dos prospects contados:", prospectStatusCounts);
-    console.log("Amostras em window.dashboardAudit");
+    console.log("window.dashboardAudit", window.dashboardAudit);
     console.groupEnd();
 }
 
@@ -294,9 +299,8 @@ function renderPodiums(currentData) {
 
 
 function getPodiumRankingGroups(currentData) {
-    // ALTERADO: Filtra os dados de forma limpa usando a inteligência do isWon
-    const wonOnlyNormal = currentData.filter(isWon);
-    const wonOnlySellers = currentData.filter(isWon);
+    const wonOnlyNormal = getUniqueWonRows(currentData).filter(item => !isOwnershipTransferChannel(item));
+    const wonOnlySellers = getUniqueWonRows(currentData).filter(item => !isOwnershipTransferChannel(item));
 
     return [
         {
@@ -447,6 +451,26 @@ function closeProspectList() {
     if (modal) modal.classList.add("hidden");
 }
 
+function sanitizeSellerFieldsForModal(rows) {
+    return rows.map(row => {
+        const normalizedRow = { ...row };
+        const resolvedSeller = getSellerValue(normalizedRow);
+
+        if (resolvedSeller) {
+            normalizedRow[COLUMN_MAP.vendedor] = resolvedSeller;
+        }
+
+        Object.keys(normalizedRow).forEach(key => {
+            const lowerKey = normalize(key);
+            if (lowerKey.includes("vendedor") && normalize(key) !== normalize(COLUMN_MAP.vendedor)) {
+                delete normalizedRow[key];
+            }
+        });
+
+        return normalizedRow;
+    });
+}
+
 function renderProspectTable(rows, options = {}) {
     const header = document.getElementById("prospectListHeader");
     const body = document.getElementById("prospectListBody");
@@ -455,43 +479,60 @@ function renderProspectTable(rows, options = {}) {
 
     if (!header || !body || !empty) return;
 
+    const displayRows = sanitizeSellerFieldsForModal(rows);
+
     header.innerHTML = "";
     body.innerHTML = "";
-    empty.classList.toggle("hidden", rows.length > 0);
+    empty.classList.toggle("hidden", displayRows.length > 0);
 
     const currentTitle = modalTitleElement ? modalTitleElement.textContent.toLowerCase() : "";
-    const hiddenColumns = options.hiddenColumns || [];
+    const hiddenColumns = [...(options.hiddenColumns || [])];
 
-    // Se todas as linhas apresentadas são vendas (vencemos) segundo a regra (isWon), esconde o Motivo de Perda
-    const allWon = rows.length > 0 && rows.every(item => isWon(item));
+    const allWon = displayRows.length > 0 && displayRows.every(item => isWon(item));
     if (allWon) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda);
         hiddenColumns.push("Motivo");
         hiddenColumns.push("Motivo de Perda");
     }
 
-    // REGRA SIMPLIFICADA 1: Se o título tem "venc", esconde o Motivo de Perda (compatibilidade retroativa)
     if (currentTitle.includes("venc")) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda);
         hiddenColumns.push("Motivo");
         hiddenColumns.push("Motivo de Perda");
     }
 
-    // REGRA SIMPLIFICADA 2: Se o título tem "perd", esconde o Plano de Venda
     if (currentTitle.includes("perd")) {
         hiddenColumns.push(COLUMN_MAP.plano);
         hiddenColumns.push("Plano");
         hiddenColumns.push("Plano de Venda");
     }
 
-    // REGRA EXTRA: Esconde o Status se o modal já for de um status segmentado
     if (currentTitle.includes("venc") || currentTitle.includes("perd") || currentTitle.includes("andamento") || currentTitle.includes("viabil")) {
         hiddenColumns.push(COLUMN_MAP.status);
         hiddenColumns.push("Status");
+        hiddenColumns.push(COLUMN_MAP.contrato);
+        hiddenColumns.push("Contrato Gerado");
+        hiddenColumns.push("Contrato");
     }
 
-    // Filtra o array final de colunas baseando-se na chave e no label visual
-    const columns = getListColumns(rows).filter(column => {
+    if (currentTitle.includes("prospect") || currentTitle.includes("andamento") || currentTitle.includes("viabil") || currentTitle.includes("perd")) {
+        hiddenColumns.push(COLUMN_MAP.contrato);
+        hiddenColumns.push("Contrato Gerado");
+        hiddenColumns.push("Contrato");
+    }
+
+    hiddenColumns.push("Vendedor Contrato");
+    hiddenColumns.push("Vendedor do contrato");
+    hiddenColumns.push("Vendedor contrato");
+    hiddenColumns.push("Vendedor de contrato");
+    hiddenColumns.push("Vendedor Prospect");
+    hiddenColumns.push("Vendedor prospect");
+    hiddenColumns.push("Vendedor do prospect");
+    hiddenColumns.push("Vendedor Comercial");
+    hiddenColumns.push("Vendedor comercial");
+    hiddenColumns.push("Consultor");
+
+    const columns = getListColumns(displayRows).filter(column => {
         const originalKey = column;
         const visualLabel = getColumnLabel(column);
 
@@ -501,7 +542,6 @@ function renderProspectTable(rows, options = {}) {
         );
     });
 
-    // Cria as tags th do Cabeçalho
     columns.forEach(column => {
         const cell = document.createElement("th");
         cell.className = "p-4 text-left text-white whitespace-normal";
@@ -509,8 +549,7 @@ function renderProspectTable(rows, options = {}) {
         header.appendChild(cell);
     });
 
-    // Cria as tags td das Linhas
-    rows.forEach(row => {
+    displayRows.forEach(row => {
         const line = document.createElement("tr");
         line.className = "hover:bg-orange-300";
 
@@ -526,44 +565,65 @@ function renderProspectTable(rows, options = {}) {
 }
 
 function getRowsByDrilldownType(type) {
-    const rows = currentFilteredData || [];
+    const rows = (currentFilteredData || []).filter(Boolean);
+    const prospectRows = rows.filter(item => isNewProspect(item, COLUMN_MAP));
 
-    if (type === "prospects") return rows;
-    if (type === "inProgress") return rows.filter(item => STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status])));
-    if (type === "won") return rows.filter(isWon);
-    if (type === "lost") return rows.filter(item => STATUS.lost.includes(normalize(item[COLUMN_MAP.status])));
-    if (type === "noViability") return rows.filter(item => STATUS.noViability.includes(normalize(item[COLUMN_MAP.status])));
-    if (type === "installationPaid") return rows.filter(item => isWon(item) && !isFreeInstallation(item));
-    if (type === "installationFree") return rows.filter(item => isWon(item) && isFreeInstallation(item));
+    if (type === "prospects") return prospectRows;
+    if (type === "inProgress") return prospectRows.filter(item => STATUS.inProgress.includes(normalize(item?.[COLUMN_MAP.status])));
+    if (type === "won") return getUniqueWonRows(rows);
+    if (type === "lost") return prospectRows.filter(item => STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status])));
+    if (type === "noViability") return prospectRows.filter(item => STATUS.noViability.includes(normalize(item?.[COLUMN_MAP.status])));
+    if (type === "installationPaid") return getUniqueWonRows(rows).filter(item => !isFreeInstallation(item));
+    if (type === "installationFree") return getUniqueWonRows(rows).filter(item => isFreeInstallation(item));
 
     return [];
 }
 
+function getWinDedupKey(item) {
+    const candidates = [
+        item?.[COLUMN_MAP.id],
+        item?.["ID Prospect"],
+        item?.["ID do prospect"],
+        item?.[COLUMN_MAP.contrato],
+        item?.["Contrato Gerado"],
+        item?.Contrato,
+        item?.["Razão"],
+        item?.Razao,
+        item?.["Nome do cliente"],
+        item?.Cliente,
+        item?.[COLUMN_MAP.vendedor]
+    ]
+
+    const firstTruthy = candidates
+        .map(value => normalize(String(value || "")))
+        .find(value => value && value !== "undefined" && value !== "null")
+
+    if (firstTruthy) return firstTruthy
+
+    return JSON.stringify({
+        status: item?.[COLUMN_MAP.status],
+        contrato: item?.[COLUMN_MAP.contrato],
+        valor: item?.[COLUMN_MAP.valorContrato],
+        vendedor: getSellerValue(item)
+    })
+}
+
+function getUniqueWonRows(rows) {
+    const unique = new Map()
+
+    rows.filter(isWon).forEach(item => {
+        const key = getWinDedupKey(item)
+        if (!unique.has(key)) {
+            unique.set(key, item)
+        }
+    })
+
+    return Array.from(unique.values())
+}
+
 function isWon(item) {
-    // 1. Primeira Métrica: O comercial marcou como ganho/vencemos?
-    const hasWonStatus = STATUS.won && STATUS.won.includes(normalize(item[COLUMN_MAP.status]));
-
-    // 2. Segunda Métrica (Auditoria): Existe um contrato preenchido e valor maior que zero?
-    const contractField = item[COLUMN_MAP.contrato];
-    const contractClean = String(contractField || "").trim().toLowerCase();
-
-    const hasContractEvidencie = contractClean !== "" &&
-        contractClean !== "-" &&
-        contractClean !== "nao" &&
-        contractClean !== "não" &&
-        contractClean !== "null" &&
-        contractClean !== "undefined";
-
-    // Usamos a função parseNumber (que já está declarada no topo do processData)
-    // Se a função global for necessária aqui, usamos o tratamento seguro:
-    let rawPrice = item[COLUMN_MAP.valorContrato];
-    let cleanPrice = String(rawPrice || "").replace(/[R$\s]/g, '').replace(',', '.').trim();
-    const hasPrice = parseFloat(cleanPrice) > 0;
-
-    const hasFinancialProof = hasContractEvidencie && hasPrice;
-
-    // REGRA DE OURO: Se passou em QUALQUER uma das duas métricas, a venda está confirmada!
-    return hasWonStatus || hasFinancialProof;
+    // A contagem correta soma Vencemos + contrato ativo e elimina IDs repetidos entre as planilhas.
+    return isRealWonSale(item, COLUMN_MAP)
 }
 
 function isWorkableSaleStatus(item) {
@@ -611,7 +671,7 @@ function getColumnLabel(column) {
 }
 
 function formatListValue(column, value) {
-    if (column === COLUMN_MAP.vendedor) return SELLER_MAP[value] || value || "-";
+    if (column === COLUMN_MAP.vendedor) return resolveSellerDisplayName(value) || value || "-";
     return value || "-";
 }
 

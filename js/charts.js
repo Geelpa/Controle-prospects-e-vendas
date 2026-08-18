@@ -555,7 +555,8 @@ function getChartDisplayValue(item, columnName) {
     }
 
     if (columnName === COLUMN_MAP.vendedor) {
-        return SELLER_MAP[key] || `Vendedor ${key}`
+        const sellerValue = getSellerValue(item)
+        return resolveSellerDisplayName(sellerValue) || sellerValue || `Vendedor ${key}`
     }
 
     return key || "Sem registro"
@@ -578,9 +579,7 @@ function openChartRows(title, rows) {
 }
 
 function isWonStatus(item) {
-    return STATUS.won.includes(
-        normalize(item[COLUMN_MAP.status])
-    )
+    return isWon(item)
 }
 
 function isLostStatus(item) {
@@ -866,11 +865,7 @@ function createSalesPerDayChart(data) {
         return
     }
 
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    const wonOnly = data.filter(item => isWon(item))
 
     const grouped = {}
 
@@ -1029,11 +1024,7 @@ function createSellersChart(data) {
         card.classList.remove("hidden")
     }
 
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    const wonOnly = data.filter(item => isWon(item))
 
     const grouped = groupBy(
         wonOnly,
@@ -1066,11 +1057,7 @@ function createInstallationChart(data) {
 
     // Exclui "Troca de Titularidade" das taxas
     const wonOnly = data
-        .filter(item =>
-            STATUS.won.includes(
-                normalize(item[COLUMN_MAP.status])
-            )
-        )
+        .filter(item => isWon(item))
         .filter(item => !isOwnershipTransferChannel(item))
 
     let paid = 0
@@ -1198,11 +1185,7 @@ function createPlansChart(data) {
     const card =
         document.getElementById("plansChartCard")
 
-    const wonOnly = data.filter(item =>
-        STATUS.won.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    const wonOnly = data.filter(item => isWon(item))
 
     const wonWithPlan = wonOnly.filter(item => {
         const planId = item[COLUMN_MAP.plano]
