@@ -135,7 +135,7 @@ function getRowsByDrilldownType(type) {
     }
 
     if (type === "won") {
-        return rows.filter(isWon)
+        return getUniqueWonRows(rows)
     }
 
     if (type === "lost") {
@@ -155,29 +155,46 @@ function getRowsByDrilldownType(type) {
     }
 
     if (type === "installationPaid") {
-        return rows.filter(item =>
-            isWon(item) && !isFreeInstallation(item)
-        )
+        return getUniqueWonRows(rows).filter(item => !isFreeInstallation(item))
     }
 
     if (type === "installationFree") {
-        return rows.filter(item =>
-            isWon(item) && isFreeInstallation(item)
-        )
+        return getUniqueWonRows(rows).filter(item => isFreeInstallation(item))
     }
 
     return []
 }
 
 function isWon(item) {
-    return STATUS.won.includes(
-        normalize(item[COLUMN_MAP.status])
-    )
+    return isRealWonSale(item, COLUMN_MAP)
 }
 
 
 function isFreeInstallation(item) {
     return parseCurrencyNumber(item[COLUMN_MAP.taxaAtivacao]) <= 0;
+}
+
+function sanitizeSellerFieldsForModal(rows) {
+    return rows.map(row => {
+        const normalizedRow = { ...row }
+        const resolvedSeller = getSellerValue(normalizedRow)
+
+        if (resolvedSeller) {
+            normalizedRow[COLUMN_MAP.vendedor] = resolvedSeller
+        }
+
+        Object.keys(normalizedRow).forEach(key => {
+            const lowerKey = normalize(key)
+            if (
+                lowerKey.includes("vendedor") &&
+                normalize(key) !== normalize(COLUMN_MAP.vendedor)
+            ) {
+                delete normalizedRow[key]
+            }
+        })
+
+        return normalizedRow
+    })
 }
 
 function renderProspectTable(rows, options = {}) {
@@ -188,10 +205,12 @@ function renderProspectTable(rows, options = {}) {
 
     if (!header || !body || !empty) return
 
+    const displayRows = sanitizeSellerFieldsForModal(rows)
+
     header.innerHTML = ""
     body.innerHTML = ""
 
-    empty.classList.toggle("hidden", rows.length > 0)
+    empty.classList.toggle("hidden", displayRows.length > 0)
 
     // 1. Pega o título do modal em letras minúsculas
     const currentTitle = modalTitleElement ? modalTitleElement.textContent.toLowerCase() : ""
@@ -219,8 +238,19 @@ function renderProspectTable(rows, options = {}) {
         hiddenColumns.push("Status")
     }
 
+    hiddenColumns.push("Vendedor Contrato")
+    hiddenColumns.push("Vendedor do contrato")
+    hiddenColumns.push("Vendedor contrato")
+    hiddenColumns.push("Vendedor de contrato")
+    hiddenColumns.push("Vendedor Prospect")
+    hiddenColumns.push("Vendedor prospect")
+    hiddenColumns.push("Vendedor do prospect")
+    hiddenColumns.push("Vendedor comercial")
+    hiddenColumns.push("Vendedor Comercial")
+    hiddenColumns.push("Consultor")
+
     // 3. Filtra as colunas comparando a chave original e o label visível
-    const columns = getListColumns(rows)
+    const columns = getListColumns(displayRows)
         .filter(column => {
             const originalKey = column
             const visualLabel = getColumnLabel(column)
@@ -242,7 +272,7 @@ function renderProspectTable(rows, options = {}) {
     })
 
     // 5. Desenha as linhas da tabela
-    rows.forEach(row => {
+    displayRows.forEach(row => {
         const line = document.createElement("tr")
         line.className = "hover:bg-yellow-900"
 
@@ -299,7 +329,7 @@ function getColumnLabel(column) {
 
 function formatListValue(column, value) {
     if (column === COLUMN_MAP.vendedor) {
-        return SELLER_MAP[value] || value || "-"
+        return resolveSellerDisplayName(value) || value || "-"
     }
 
     return value || "-"

@@ -25,15 +25,19 @@ const parseNumber = (value) => {
 };
 
 // 2. Identifica se é um prospect novo ou movimentação de base
-const isNewProspect = (item, COLUMN_MAP) => {
+const isNewProspect = (item, map = COLUMN_MAP) => {
+    if (!item || !map) return false;
+
     // Criamos uma mini função local de normalizar para garantir que nunca quebre por escopo
     const localNormalize = (str) => String(str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
-    const plano = localNormalize(item[COLUMN_MAP.plano]);
-    const campanha = localNormalize(item[COLUMN_MAP.campanha]);
-    const canal = localNormalize(item[COLUMN_MAP.canal]);
+    const plano = localNormalize(item[map.plano]);
+    const campanha = localNormalize(item[map.campanha]);
+    const canal = localNormalize(item[map.canal]);
     const invalidTerms = ["adicional"];
 
+    // Plano adicional não é prospect novo, mas isso não impede que gere venda/contrato.
+    // Troca de titularidade continua sendo tratada como prospect, porque representa entrada de cliente novo.
     return !invalidTerms.some(term =>
         plano.includes(term) || campanha.includes(term) || canal.includes(term)
     );
@@ -42,10 +46,12 @@ const isNewProspect = (item, COLUMN_MAP) => {
 // 3. REGRA DE OURO CORRIGIDA: 
 // Uma venda é real se tiver ALGO na coluna contrato (que não seja vazio, traço ou "não") E valor maior que zero.
 const isRealWonSale = (item, COLUMN_MAP) => {
+    const statusText = normalize(String(item?.[COLUMN_MAP.status] || ""));
+    const hasWonStatus = STATUS.won.includes(statusText);
+
     const contractField = item[COLUMN_MAP.contrato];
     const contractClean = String(contractField || "").trim().toLowerCase();
 
-    // Considera que tem contrato se o campo não estiver vazio, não for só um traço ou a palavra "não"
     const hasContract = contractClean !== "" &&
         contractClean !== "-" &&
         contractClean !== "nao" &&
@@ -54,7 +60,9 @@ const isRealWonSale = (item, COLUMN_MAP) => {
         contractClean !== "undefined";
 
     const price = parseNumber(item[COLUMN_MAP.valorContrato]);
+    const hasPrice = price > 0;
 
-    // Se tiver preenchimento de contrato E o preço for maior que zero, é Venda Ganha!
-    return hasContract && price > 0;
+    // Regra correta do negócio: considera como venda confirmada qualquer item
+    // que esteja como "vencemos" ou que tenha contrato ativo com valor.
+    return hasWonStatus || (hasContract && hasPrice);
 };
