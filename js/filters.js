@@ -7,32 +7,79 @@ function populateFilters(data) {
 
 function populateSellerFilter(data) {
 
-    const select =
-        document.getElementById("sellerFilter")
+    const select = document.getElementById("sellerFilter")
 
-    select.innerHTML =
-        '<option value="all">Todos</option>'
+    if (!select) return
 
-    const sellers = [
-        ...new Set(
-            data
-                .map(item => getSellerValue(item))
-                .filter(value => value && value !== "undefined" && value !== "null")
+    const hasSellerActivity = (item) => {
+        const responsibleSeller = getField(item, COLUMN_MAP.vendedor, [
+            "Vendedor",
+            "Vendedor Prospect",
+            "Vendedor prospect",
+            "Vendedor do prospect",
+            "Vendedor Comercial",
+            "Vendedor comercial",
+            "Vendedor responsável",
+            "Responsável",
+            "Responsavel",
+            "Vendor",
+            "Consultor"
+        ])
+
+        const rawSeller = responsibleSeller ?? getSellerValue(item)
+
+        if (!rawSeller) return false
+
+        const sellerValue = String(rawSeller).trim()
+        if (!sellerValue || sellerValue === "undefined" || sellerValue === "null") return false
+
+        const hasKnownSellerId = !/^\d+$/.test(sellerValue) || !!resolveSellerDisplayName(sellerValue)
+        if (!hasKnownSellerId) return false
+
+        const status = normalize(item?.[COLUMN_MAP.status])
+        const hasStatusMatch = status && (
+            STATUS.won.includes(status) ||
+            STATUS.lost.includes(status) ||
+            STATUS.noViability.includes(status) ||
+            STATUS.inProgress.includes(status)
         )
-    ]
 
-    sellers.forEach(id => {
+        const contractValue = String(item?.[COLUMN_MAP.contrato] || item?.["Contrato Gerado"] || item?.Contrato || "").trim()
+        const hasContract = contractValue !== "" && contractValue !== "-"
 
-        const option = document.createElement("option")
+        const hasRevenue = parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato] || item?.["Valor contrato"] || item?.["Valor do contrato"] || 0) > 0
 
-        const sellerLabel = resolveSellerDisplayName(id) || id
+        return hasStatusMatch || hasContract || hasRevenue
+    }
 
-        option.value = sellerLabel
+    select.innerHTML = '<option value="all">Todos</option>'
 
-        option.textContent = sellerLabel
+    const uniqueSellers = new Map()
 
-        select.appendChild(option)
+    data.forEach(item => {
+        if (!hasSellerActivity(item)) return
+
+        const rawValue = String(getSellerValue(item)).trim()
+        const sellerLabel = resolveSellerDisplayName(rawValue) || rawValue
+
+        if (/^\d+$/.test(rawValue) && sellerLabel === rawValue) return
+
+        const sellerKey = normalize(sellerLabel)
+        if (!sellerKey) return
+
+        if (!uniqueSellers.has(sellerKey)) {
+            uniqueSellers.set(sellerKey, sellerLabel)
+        }
     })
+
+    Array.from(uniqueSellers.values())
+        .sort((a, b) => a.localeCompare(b, "pt-BR"))
+        .forEach(sellerLabel => {
+            const option = document.createElement("option")
+            option.value = sellerLabel
+            option.textContent = sellerLabel
+            select.appendChild(option)
+        })
 }
 
 function populateMonthFilter(data) {
