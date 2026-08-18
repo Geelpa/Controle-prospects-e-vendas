@@ -132,6 +132,92 @@ function extractActivationDate(row) {
     ])
 }
 
+function getBusinessDateForRow(row) {
+    if (!row) return null
+
+    const activationDate = extractActivationDate(row)
+    const hasActivationDate = !!activationDate
+
+    const hasWonSignal = (
+        typeof isWon === "function" && isWon(row)
+    ) || (
+        normalize(String(row?.[COLUMN_MAP.status] || "")) === "vencemos"
+    ) || (
+        String(row?.[COLUMN_MAP.contrato] || "").trim() !== "" &&
+        String(row?.[COLUMN_MAP.contrato] || "").trim() !== "-"
+    )
+
+    if (hasActivationDate && hasWonSignal) {
+        return activationDate
+    }
+
+    return extractRegistrationDate(row)
+}
+
+function resolveSellerDisplayName(value) {
+    if (value === undefined || value === null) return ""
+
+    const rawValue = String(value).trim()
+
+    if (!rawValue || rawValue === "undefined" || rawValue === "null") {
+        return ""
+    }
+
+    return SELLER_MAP[rawValue] || SELLER_MAP[String(rawValue).replace(/^0+/, "")] || rawValue
+}
+
+function getSellerValue(row) {
+    const contractSeller = getField(row, COLUMN_MAP.vendedorContrato, [
+        "Vendedor Contrato",
+        "Vendedor do contrato",
+        "Vendedor contrato",
+        "Consultor contrato",
+        "Vendedor de contrato",
+        "Contrato Vendedor"
+    ])
+
+    if (contractSeller !== undefined && contractSeller !== null && String(contractSeller).trim() !== "" && String(contractSeller).trim() !== "undefined") {
+        return String(contractSeller).trim()
+    }
+
+    const responsibleSeller = getField(row, COLUMN_MAP.vendedor, [
+        "Vendedor",
+        "Vendedor Prospect",
+        "Vendedor prospect",
+        "Vendedor do prospect",
+        "Vendedor Comercial",
+        "Vendedor comercial",
+        "Vendedor responsável",
+        "Responsável",
+        "Responsavel",
+        "Vendor",
+        "Consultor"
+    ])
+
+    if (responsibleSeller !== undefined && responsibleSeller !== null && String(responsibleSeller).trim() !== "" && String(responsibleSeller).trim() !== "undefined") {
+        return String(responsibleSeller).trim()
+    }
+
+    return ""
+}
+
+function getContractSellerValue(row) {
+    const contractSeller = getField(row, COLUMN_MAP.vendedorContrato, [
+        "Vendedor Contrato",
+        "Vendedor do contrato",
+        "Vendedor contrato",
+        "Consultor contrato",
+        "Vendedor de contrato",
+        "Contrato Vendedor"
+    ])
+
+    if (contractSeller !== undefined && contractSeller !== null && String(contractSeller).trim() !== "" && String(contractSeller).trim() !== "undefined") {
+        return String(contractSeller).trim()
+    }
+
+    return getSellerValue(row)
+}
+
 function groupBy(data, columnName) {
 
     const grouped = {}
@@ -153,9 +239,8 @@ function groupBy(data, columnName) {
         }
 
         if (columnName === COLUMN_MAP.vendedor) {
-            key =
-                SELLER_MAP[key] ||
-                `Vendedor ${key}`
+            const sellerValue = getSellerValue(item)
+            key = resolveSellerDisplayName(sellerValue) || sellerValue || `Vendedor ${key}`
         }
 
         grouped[key] =

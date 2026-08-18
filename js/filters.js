@@ -15,7 +15,9 @@ function populateSellerFilter(data) {
 
     const sellers = [
         ...new Set(
-            data.map(item => item[COLUMN_MAP.vendedor])
+            data
+                .map(item => getSellerValue(item))
+                .filter(value => value && value !== "undefined" && value !== "null")
         )
     ]
 
@@ -23,10 +25,11 @@ function populateSellerFilter(data) {
 
         const option = document.createElement("option")
 
-        option.value = id
+        const sellerLabel = resolveSellerDisplayName(id) || id
 
-        option.textContent =
-            SELLER_MAP[id] || `Vendedor ${id}`
+        option.value = sellerLabel
+
+        option.textContent = sellerLabel
 
         select.appendChild(option)
     })
@@ -48,7 +51,7 @@ function populateMonthFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        extractRegistrationDate(item)
+                        getBusinessDateForRow(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -99,7 +102,7 @@ function populateYearFilter(data) {
                 .map(item => {
 
                     const parsedDate =
-                        extractRegistrationDate(item)
+                        getBusinessDateForRow(item)
 
                     // IGNORA DATAS INVÁLIDAS
                     if (!parsedDate) return null
@@ -156,7 +159,7 @@ function applyFilters() {
 
         // DATA
         const parsedDate =
-            extractRegistrationDate(item)
+            getBusinessDateForRow(item)
 
         // IGNORA DATAS INVÁLIDAS
         if (!parsedDate) return false
@@ -172,8 +175,8 @@ function applyFilters() {
 
             seller === "all" ||
 
-            String(item[COLUMN_MAP.vendedor]) ===
-            String(seller)
+            normalize(resolveSellerDisplayName(getSellerValue(item))) ===
+            normalize(String(seller))
 
         // MÊS
         const monthMatch =
