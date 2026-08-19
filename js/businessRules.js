@@ -62,7 +62,7 @@ const isRealWonSale = (item, COLUMN_MAP) => {
     const price = parseNumber(item[COLUMN_MAP.valorContrato]);
     const hasPrice = price > 0;
 
-    // Regra correta do negócio: considera como venda confirmada qualquer item
-    // que esteja como "vencemos" ou que tenha contrato ativo com valor.
-    return hasWonStatus || (hasContract && hasPrice);
+    // Removida a dependência de status textual para considerar venda real.
+    // Agora consideramos venda confirmada apenas quando existe contrato ativo com valor.
+    return (hasContract && hasPrice);
 };

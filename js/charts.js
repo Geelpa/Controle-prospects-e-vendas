@@ -543,7 +543,7 @@ function getChartDisplayValue(item, columnName) {
     let key = item[columnName]
 
     if (columnName === COLUMN_MAP.plano) {
-        return key || "Sem plano"
+        return resolvePlanDisplayName(key) || "Sem plano"
     }
 
     if (columnName === COLUMN_MAP.campanha) {
@@ -560,6 +560,55 @@ function getChartDisplayValue(item, columnName) {
     }
 
     return key || "Sem registro"
+}
+
+function getChartDedupKey(item) {
+    const candidates = [
+        item?.[COLUMN_MAP.id],
+        item?.["ID Prospect"],
+        item?.["ID do prospect"],
+        item?.[COLUMN_MAP.contrato],
+        item?.["Contrato Gerado"],
+        item?.Contrato,
+        item?.["Razão"],
+        item?.Razao,
+        item?.["Nome do cliente"],
+        item?.Cliente,
+        item?.[COLUMN_MAP.telefone],
+        item?.Telefone,
+        item?.Celular,
+        getSellerValue(item)
+    ]
+
+    const firstTruthy = candidates
+        .map(value => normalize(String(value || "")))
+        .find(value => value && value !== "undefined" && value !== "null")
+
+    if (firstTruthy) return firstTruthy
+
+    return JSON.stringify({
+        status: item?.[COLUMN_MAP.status],
+        contrato: item?.[COLUMN_MAP.contrato],
+        valor: item?.[COLUMN_MAP.valorContrato],
+        vendedor: getSellerValue(item),
+        campanha: item?.[COLUMN_MAP.campanha],
+        canal: item?.[COLUMN_MAP.canal]
+    })
+}
+
+function getDeduplicatedChartRows(data) {
+    const unique = new Map()
+
+    ;(data || []).forEach(item => {
+        if (!item) return
+
+        const key = getChartDedupKey(item)
+        if (!unique.has(key)) {
+            unique.set(key, item)
+        }
+    })
+
+    return Array.from(unique.values())
 }
 
 function rowsMatchingChartValue(data, columnName, label, rowFilter) {
@@ -594,14 +643,14 @@ function getSplitStatusEntries(data, columnName, limit = 8) {
     data.forEach(item => {
         if (!isWonStatus(item) && !isLostStatus(item)) return
 
-        const label =
-            getChartDisplayValue(item, columnName)
+        const rawLabel = getChartDisplayValue(item, columnName) || ""
+        const normalizedLabel = normalize(rawLabel)
 
-        if (!label || normalize(label) === "undefined") return
+        if (!normalizedLabel || normalizedLabel === "undefined") return
 
-        if (!grouped[label]) {
-            grouped[label] = {
-                label,
+        if (!grouped[normalizedLabel]) {
+            grouped[normalizedLabel] = {
+                label: rawLabel,
                 won: 0,
                 lost: 0,
                 total: 0
@@ -609,14 +658,14 @@ function getSplitStatusEntries(data, columnName, limit = 8) {
         }
 
         if (isWonStatus(item)) {
-            grouped[label].won++
+            grouped[normalizedLabel].won++
         }
 
         if (isLostStatus(item)) {
-            grouped[label].lost++
+            grouped[normalizedLabel].lost++
         }
 
-        grouped[label].total++
+        grouped[normalizedLabel].total++
     })
 
     return Object.values(grouped)
@@ -774,8 +823,10 @@ function createChannelsChart(data) {
 
     destroyChart(channelsChart)
 
+    const uniqueData = getDeduplicatedChartRows(data)
+
     // Exclui movimentos de "Troca de Titularidade" dos canais
-    const filteredData = data.filter(item => !isOwnershipTransferChannel(item))
+    const filteredData = uniqueData.filter(item => !isOwnershipTransferChannel(item))
 
     const entries =
         getSplitStatusEntries(filteredData, COLUMN_MAP.canal, 8)
@@ -801,8 +852,9 @@ function createCampaignsChart(data) {
 
     destroyChart(campaignsChart)
 
+    const uniqueData = getDeduplicatedChartRows(data)
     const entries =
-        getSplitStatusEntries(data, COLUMN_MAP.campanha, 8)
+        getSplitStatusEntries(uniqueData, COLUMN_MAP.campanha, 8)
 
     if (!hasSplitComparisonData(entries)) {
         toggleChartCard("campaignsChartCard", false)
@@ -816,7 +868,7 @@ function createCampaignsChart(data) {
         entries,
         (label, statusType) => openChartRows(
             `Campanha: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
-            rowsMatchingChartStatus(data, COLUMN_MAP.campanha, label, statusType)
+            rowsMatchingChartStatus(uniqueData, COLUMN_MAP.campanha, label, statusType)
         )
     )
 }
@@ -825,7 +877,8 @@ function createLossReasonsChart(data) {
 
     destroyChart(lossReasonsChart)
 
-    const lostOnly = data.filter(item =>
+    const uniqueData = getDeduplicatedChartRows(data)
+    const lostOnly = uniqueData.filter(item =>
         STATUS.lost.includes(
             normalize(item[COLUMN_MAP.status])
         )

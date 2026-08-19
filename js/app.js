@@ -1,4 +1,4 @@
-function processData(data) {
+function processData(prospectData, salesData) {
     // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos
     const parseNumber = (value) => {
         if (value === undefined || value === null || String(value).trim() === "") return 0;
@@ -35,14 +35,15 @@ function processData(data) {
 
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
-    const prospectsData = data.filter(item => isNewProspect(item, COLUMN_MAP));
-    currentFilteredData = data;
+    const prospectsData = (prospectData || []).filter(item => isNewProspect(item, COLUMN_MAP));
+    currentFilteredData = salesData || [];
+    currentProspectFilteredData = prospectsData;
     const currentProspectData = prospectsData;
     const totalProspects = prospectsData.length;
 
     // As vendas e ativações devem considerar também adicionais e troca de titularidade,
     // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
-    const wonRows = getUniqueWonRows(data);
+    const wonRows = getUniqueWonRows(salesData || []);
     const won = wonRows.length;
     const salesPerformanceRows = wonRows.filter(item => !isOwnershipTransferChannel(item));
 
@@ -135,7 +136,7 @@ function processData(data) {
 
     // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
-        logDashboardAudit(data, prospectsData, isNewProspect);
+        logDashboardAudit(salesData || [], prospectsData, isNewProspect);
     } catch (e) { /** não quebrar a execução */ }     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
@@ -160,10 +161,10 @@ function processData(data) {
     if (typeof createInstallationChart === "function") createInstallationChart(chartDataWithCorrectSellers);
     if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(chartDataWithCorrectSellers);
 
-    // Gráficos de funil e comparação de status continuam na base completa filtrada.
-    if (typeof createChannelsChart === "function") createChannelsChart(data);
-    if (typeof createCampaignsChart === "function") createCampaignsChart(data);
-    if (typeof createLossReasonsChart === "function") createLossReasonsChart(data);
+    // Gráficos de funil e comparação de status continuam na base completa filtrada (vendas/ativação).
+    if (typeof createChannelsChart === "function") createChannelsChart(salesData || []);
+    if (typeof createCampaignsChart === "function") createCampaignsChart(salesData || []);
+    if (typeof createLossReasonsChart === "function") createLossReasonsChart(salesData || []);
 }
 
 function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
@@ -565,16 +566,19 @@ function renderProspectTable(rows, options = {}) {
 }
 
 function getRowsByDrilldownType(type) {
-    const rows = (currentFilteredData || []).filter(Boolean);
-    const prospectRows = rows.filter(item => isNewProspect(item, COLUMN_MAP));
+    const salesRows = (currentFilteredData || []).filter(Boolean);
+    const prospectRows = (currentProspectFilteredData || []).filter(Boolean);
 
+    // Prospects-related drilldowns should use the registration-based dataset
     if (type === "prospects") return prospectRows;
     if (type === "inProgress") return prospectRows.filter(item => STATUS.inProgress.includes(normalize(item?.[COLUMN_MAP.status])));
-    if (type === "won") return getUniqueWonRows(rows);
     if (type === "lost") return prospectRows.filter(item => STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status])));
     if (type === "noViability") return prospectRows.filter(item => STATUS.noViability.includes(normalize(item?.[COLUMN_MAP.status])));
-    if (type === "installationPaid") return getUniqueWonRows(rows).filter(item => !isFreeInstallation(item));
-    if (type === "installationFree") return getUniqueWonRows(rows).filter(item => isFreeInstallation(item));
+
+    // Sales/activation-related drilldowns use the sales/activation dataset
+    if (type === "won") return getUniqueWonRows(salesRows);
+    if (type === "installationPaid") return getUniqueWonRows(salesRows).filter(item => !isFreeInstallation(item));
+    if (type === "installationFree") return getUniqueWonRows(salesRows).filter(item => isFreeInstallation(item));
 
     return [];
 }

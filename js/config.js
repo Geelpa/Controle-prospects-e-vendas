@@ -2,6 +2,7 @@ let sellersChart
 let installationChart
 let rawData = []
 let currentFilteredData = []
+let currentProspectFilteredData = []
 
 const COLUMN_MAP = {
     id: "ID",

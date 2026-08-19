@@ -11,7 +11,55 @@ function destroyChart(chart) {
 }
 
 function applyBusinessRules(row) {
-    return row
+    if (!row) return row
+
+    // Work on a shallow copy to avoid surprising side-effects
+    const newRow = { ...row }
+
+    // Resolve column names present in the row (handles different header aliases)
+    const canalCol = findColumnName(row, COLUMN_MAP.canal)
+    const campCol = findColumnName(row, COLUMN_MAP.campanha)
+    const statusCol = findColumnName(row, COLUMN_MAP.status)
+    const contractCol = findColumnName(row, COLUMN_MAP.contrato)
+
+    const canalVal = canalCol ? String(row[canalCol] || "").trim() : ""
+    const campVal = campCol ? String(row[campCol] || "").trim() : ""
+    const statusVal = statusCol ? String(row[statusCol] || "").trim() : ""
+    const contractVal = contractCol ? String(row[contractCol] || "").trim() : ""
+
+    // Normalizar canais vagos/sem resposta para 'Outros'
+    const canalNormalize = normalize(canalVal)
+    const canaisOutros = [
+        "sem canal",
+        "cliente não informou",
+        "cliente nao informou",
+        "não interagiu",
+        "nao interagiu",
+        "esqueci de perguntar",
+        "esqueci de perguntar "
+    ]
+
+    if (canalCol && canalNormalize && canaisOutros.includes(canalNormalize)) {
+        newRow[canalCol] = "Outros"
+    }
+
+    // Rule: if canal de venda é 'troca de titularidade', preencher campanha com o mesmo nome
+    if (canalVal && normalize(canalVal) === "troca de titularidade" && campCol) {
+        newRow[campCol] = canalVal
+    }
+
+    // Rule: se campanha é 'troca de titularidade', preencher canal com 'troca de titularidade'
+    if (campVal && normalize(campVal) === "troca de titularidade" && canalCol) {
+        newRow[canalCol] = campVal || "Troca de Titularidade"
+    }
+
+    // Rule: se status estiver como 'novo' e contrato ativo, ajustar status para 'Vencemos'
+    const hasContractActive = contractVal !== "" && contractVal !== "-"
+    if (statusVal && normalize(statusVal) === "novo" && hasContractActive && statusCol) {
+        newRow[statusCol] = "Vencemos"
+    }
+
+    return newRow
 }
 
 function isOwnershipTransferChannel(row) {
@@ -166,6 +214,57 @@ function resolveSellerDisplayName(value) {
     return SELLER_MAP[rawValue] || SELLER_MAP[String(rawValue).replace(/^0+/, "")] || rawValue
 }
 
+// Normaliza nomes de plano para evitar variações que representam a mesma configuração
+function resolvePlanDisplayName(value) {
+    if (value === undefined || value === null) return ""
+
+    const raw = String(value).trim()
+    if (!raw) return ""
+
+    const lower = raw.toLowerCase()
+
+    // Checa mapeamento direto primeiro (arquivo js/maps/plans.js)
+    try {
+        if (typeof PLAN_MAP !== 'undefined') {
+            const direct = PLAN_MAP[raw] || PLAN_MAP[lower] || PLAN_MAP[String(raw).replace(/^0+/, '')]
+            if (direct) return direct
+        }
+    } catch (e) { /* ignore if PLAN_MAP not present */ }
+
+    // Regras específicas solicitadas:
+    // 300Mb em dobro => Plus - 600Mb
+    if (/300\s*mb/.test(lower) && /dobro/.test(lower)) return 'Plus - 600Mb'
+
+    // 400Mb em dobro => Power - 800Mb
+    if (/400\s*mb/.test(lower) && /dobro/.test(lower)) return 'Power - 800Mb'
+
+    // Plano Adicional 200Mb em DOBRO VPU - PF => Adicional Start - 500Mb
+    // if (/200\s*mb/.test(lower) && /dobro/.test(lower) && /adicional/.test(lower)) return 'Adicional Start - 500Mb'
+
+    // Outras variações contendo "em dobro" com números próximos
+    const mDobro = lower.match(/(\d{2,4})\s*mb.*dobro/)
+    if (mDobro) {
+        const num = Number(mDobro[1])
+        if (num === 300) return 'Plus - 600Mb'
+        if (num === 400) return 'Power - 800Mb'
+        // if (num === 200) return 'Adicional Start - 500Mb'
+    }
+
+    // NOVAS REGRAS PME
+    // Mapear variações PME/Empresarial para nomes compactos
+    if (/pme/.test(lower) || /empresari/.test(lower)) {
+        // 400Mb PME
+        if (/400\s*mb/.test(lower)) return '400Mb - PME'
+        // 1Gb PME
+        if (/1\s*gb/.test(lower) || /1gb/.test(lower)) return '1Gb + mesh - PME'
+        // 200Mb PME
+        if (/200\s*mb/.test(lower)) return '200Mb - PME'
+    }
+
+    // Sem mapeamento específico, retorna o texto original mas trimmed
+    return raw
+}
+
 function getSellerValue(row) {
     const contractSeller = getField(row, COLUMN_MAP.vendedorContrato, [
         "Vendedor Contrato",
@@ -227,7 +326,8 @@ function groupBy(data, columnName) {
         let key = getField(item, columnName)
 
         if (columnName === COLUMN_MAP.plano) {
-            key = key || "Sem plano"
+            // Normaliza o nome do plano antes de agrupar para evitar variações que representam o mesmo produto
+            key = resolvePlanDisplayName(key) || key || "Sem plano"
         }
 
         if (columnName === COLUMN_MAP.campanha) {

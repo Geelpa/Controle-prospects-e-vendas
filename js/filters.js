@@ -202,53 +202,57 @@ function applyFilters() {
             month === "all" ? "month" : "week"
     }
 
-    const filteredData = rawData.filter(item => {
+    // Build two filtered datasets:
+    // 1) prospectFilteredData: used for prospect KPIs (based on registration date)
+    // 2) salesFilteredData: used for wins/activations/charts (based on business/activation date)
 
-        // DATA
-        const parsedDate =
-            getBusinessDateForRow(item)
-
-        // IGNORA DATAS INVÁLIDAS
-        if (!parsedDate) return false
-
-        const itemMonth =
-            parsedDate.getMonth() + 1
-
-        const itemYear =
-            parsedDate.getFullYear()
-
-        // VENDEDOR
+    const prospectFilteredData = rawData.filter(item => {
+        // seller match
         const sellerMatch =
-
             seller === "all" ||
+            normalize(resolveSellerDisplayName(getSellerValue(item))) === normalize(String(seller))
 
-            normalize(resolveSellerDisplayName(getSellerValue(item))) ===
-            normalize(String(seller))
+        if (!sellerMatch) return false
 
-        // MÊS
-        const monthMatch =
+        if (month === "all" && year === "all") return true
 
-            month === "all" ||
+        const regDate = extractRegistrationDate(item)
+        if (!regDate) return false
 
-            itemMonth === Number(month)
+        const itemMonth = regDate.getMonth() + 1
+        const itemYear = regDate.getFullYear()
 
-        // ANO
-        const yearMatch =
+        const monthMatch = month === "all" || itemMonth === Number(month)
+        const yearMatch = year === "all" || itemYear === Number(year)
 
-            year === "all" ||
-
-            itemYear === Number(year)
-
-        return (
-            sellerMatch &&
-            monthMatch &&
-            yearMatch
-        )
+        return monthMatch && yearMatch
     })
 
-    updateSalesChartFilters(filteredData, month)
+    const salesFilteredData = rawData.filter(item => {
+        // seller match
+        const sellerMatch =
+            seller === "all" ||
+            normalize(resolveSellerDisplayName(getSellerValue(item))) === normalize(String(seller))
 
-    processData(filteredData)
+        if (!sellerMatch) return false
+
+        if (month === "all" && year === "all") return true
+
+        const parsedDate = getBusinessDateForRow(item)
+        if (!parsedDate) return false
+
+        const itemMonth = parsedDate.getMonth() + 1
+        const itemYear = parsedDate.getFullYear()
+
+        const monthMatch = month === "all" || itemMonth === Number(month)
+        const yearMatch = year === "all" || itemYear === Number(year)
+
+        return monthMatch && yearMatch
+    })
+
+    updateSalesChartFilters(salesFilteredData, month)
+
+    processData(prospectFilteredData, salesFilteredData)
 }
 
 function updateSalesChartFilters(data, selectedMonth) {

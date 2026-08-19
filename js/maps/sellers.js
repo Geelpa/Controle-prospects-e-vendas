@@ -1,6 +1,5 @@
 const SELLER_MAP = {
     "48": "Eduardo Lima",
-    "181": "Eduardo Lima",
     "67": "Nicole Gahlern",
     "35": "Jonas Paixão",
     "25": "Lucas Dai Prá",
@@ -12,6 +11,7 @@ const SELLER_MAP = {
     "43": "José Luiz",
     "62": "João Pedro",
     "63": "Maria Cecilia",
+    "64": "Márcia Cristina",
     "54": "Poliana Guimarães",
     "45": "Emily Goulart",
     "74": "Leandro Farias",
