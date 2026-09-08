@@ -4,6 +4,7 @@ const CHART_COLORS = {
     emerald: "#26ad14", // brighter to contrast on dark background (used for 'vencemos')
     amber: "#C68642",  // toffee (accent)
     rose: "#a02c18",   // warmer red-brown for contrast (dataset)
+    gray: "#8a8f98",   // gray for prospects without viability
     violet: "#73503C", // brownish-violet for subtle contrast
     slate: "#4A2F2B",  // dark slate brown (borders)
     grid: "#efe6df",   // light beige background/grid
@@ -393,10 +394,6 @@ function createHorizontalBarChart(canvasId, label, entries, color, onSelectEntry
                     label,
                     data: values,
                     backgroundColor: color,
-                    borderColor: color,
-                    borderWidth: 1,
-                    borderRadius: 6,
-                    borderSkipped: false,
                     barPercentage: 0.72,
                     categoryPercentage: 0.72
                 }]
@@ -476,10 +473,7 @@ function createSplitStatusBarChart(canvasId, entries, onSelectEntry) {
                 elements[0]
             const entry =
                 entries[element.index]
-            const dataset =
-                element.datasetIndex === 0
-                    ? "won"
-                    : "lost"
+            const dataset = ["won", "lost", "noViability"][element.datasetIndex]
 
             if (entry) {
                 onSelectEntry(entry.label, dataset)
@@ -503,15 +497,6 @@ function createSplitStatusBarChart(canvasId, entries, onSelectEntry) {
                         label: "Vencemos",
                         data: entries.map(entry => entry.won),
                         backgroundColor: CHART_COLORS.emerald,
-                        borderColor: CHART_COLORS.emerald,
-                        borderWidth: 0,
-                        borderRadius: {
-                            topLeft: 6,
-                            bottomLeft: 6,
-                            topRight: 0,
-                            bottomRight: 0
-                        },
-                        borderSkipped: false,
                         barPercentage: 0.64,
                         categoryPercentage: 0.76
                     },
@@ -519,15 +504,13 @@ function createSplitStatusBarChart(canvasId, entries, onSelectEntry) {
                         label: "Perdemos",
                         data: entries.map(entry => entry.lost),
                         backgroundColor: CHART_COLORS.rose,
-                        borderColor: CHART_COLORS.rose,
-                        borderWidth: 0,
-                        borderRadius: {
-                            topLeft: 0,
-                            bottomLeft: 0,
-                            topRight: 6,
-                            bottomRight: 6
-                        },
-                        borderSkipped: false,
+                        barPercentage: 0.64,
+                        categoryPercentage: 0.76
+                    },
+                    {
+                        label: "Sem viabilidade",
+                        data: entries.map(entry => entry.noViability),
+                        backgroundColor: CHART_COLORS.gray,
                         barPercentage: 0.64,
                         categoryPercentage: 0.76
                     }
@@ -637,11 +620,21 @@ function isLostStatus(item) {
     )
 }
 
+function isNoViabilityStatus(item) {
+    return STATUS.noViability.includes(
+        normalize(item[COLUMN_MAP.status])
+    )
+}
+
+function isLossStatus(item) {
+    return isLostStatus(item) || isNoViabilityStatus(item)
+}
+
 function getSplitStatusEntries(data, columnName, limit = 8) {
     const grouped = {}
 
     data.forEach(item => {
-        if (!isWonStatus(item) && !isLostStatus(item)) return
+        if (!isWonStatus(item) && !isLossStatus(item)) return
 
         const rawLabel = getChartDisplayValue(item, columnName) || ""
         const normalizedLabel = normalize(rawLabel)
@@ -653,6 +646,7 @@ function getSplitStatusEntries(data, columnName, limit = 8) {
                 label: rawLabel,
                 won: 0,
                 lost: 0,
+                noViability: 0,
                 total: 0
             }
         }
@@ -663,6 +657,10 @@ function getSplitStatusEntries(data, columnName, limit = 8) {
 
         if (isLostStatus(item)) {
             grouped[normalizedLabel].lost++
+        }
+
+        if (isNoViabilityStatus(item)) {
+            grouped[normalizedLabel].noViability++
         }
 
         grouped[normalizedLabel].total++
@@ -686,8 +684,16 @@ function rowsMatchingChartStatus(data, columnName, label, statusType) {
         label,
         item => statusType === "won"
             ? isWonStatus(item)
-            : isLostStatus(item)
+            : statusType === "noViability"
+                ? isNoViabilityStatus(item)
+                : isLostStatus(item)
     )
+}
+
+function getChartStatusLabel(statusType) {
+    if (statusType === "won") return "Vencemos"
+    if (statusType === "noViability") return "Sem viabilidade"
+    return "Perdemos"
 }
 
 function toggleChartCard(cardId, shouldShow) {
@@ -842,7 +848,7 @@ function createChannelsChart(data) {
         "channelsChart",
         entries,
         (label, statusType) => openChartRows(
-            `Canal: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
+            `Canal: ${label} - ${getChartStatusLabel(statusType)}`,
             rowsMatchingChartStatus(filteredData, COLUMN_MAP.canal, label, statusType)
         )
     )
@@ -867,7 +873,7 @@ function createCampaignsChart(data) {
         "campaignsChart",
         entries,
         (label, statusType) => openChartRows(
-            `Campanha: ${label} - ${statusType === "won" ? "Vencemos" : "Perdemos"}`,
+            `Campanha: ${label} - ${getChartStatusLabel(statusType)}`,
             rowsMatchingChartStatus(uniqueData, COLUMN_MAP.campanha, label, statusType)
         )
     )
@@ -878,11 +884,7 @@ function createLossReasonsChart(data) {
     destroyChart(lossReasonsChart)
 
     const uniqueData = getDeduplicatedChartRows(data)
-    const lostOnly = uniqueData.filter(item =>
-        STATUS.lost.includes(
-            normalize(item[COLUMN_MAP.status])
-        )
-    )
+    const lostOnly = uniqueData.filter(isLossStatus)
 
     const grouped = groupBy(
         lostOnly,
