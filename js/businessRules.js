@@ -43,26 +43,19 @@ const isNewProspect = (item, map = COLUMN_MAP) => {
     );
 };
 
-// 3. REGRA DE OURO CORRIGIDA: 
-// Uma venda é real se tiver ALGO na coluna contrato (que não seja vazio, traço ou "não") E valor maior que zero.
+// Uma venda é real quando o contrato está em um status válido e possui valor.
 const isRealWonSale = (item, COLUMN_MAP) => {
-    const statusText = normalize(String(item?.[COLUMN_MAP.status] || ""));
-    const hasWonStatus = STATUS.won.includes(statusText);
-
-    const contractField = item[COLUMN_MAP.contrato];
-    const contractClean = String(contractField || "").trim().toLowerCase();
-
-    const hasContract = contractClean !== "" &&
-        contractClean !== "-" &&
-        contractClean !== "nao" &&
-        contractClean !== "não" &&
-        contractClean !== "null" &&
-        contractClean !== "undefined";
+    const contractCategory = getContractStatusCategory(item)
+    if (contractCategory === "cancelled" || contractCategory === "withdrawn") return false
+    const contractStatus = normalize(String(item?.[COLUMN_MAP.statusContrato] || ""));
+    const hasContract = contractStatus !== "" &&
+        !STATUS.contractPre.includes(contractStatus) &&
+        !STATUS.contractInactive.includes(contractStatus) &&
+        !STATUS.contractWithdrawn.includes(contractStatus) &&
+        !STATUS.contractCancelled.includes(contractStatus);
 
     const price = parseNumber(item[COLUMN_MAP.valorContrato]);
     const hasPrice = price > 0;
 
-    // Removida a dependência de status textual para considerar venda real.
-    // Agora consideramos venda confirmada apenas quando existe contrato ativo com valor.
     return (hasContract && hasPrice);
 };

@@ -29,7 +29,7 @@ function rowCompletenessScore(row) {
     ).length
 
     const hasStatus = normalizeCsvText(row?.Status) !== ""
-    const hasContract = normalizeCsvText(row?.["Contrato Gerado"] || row?.Contrato) !== ""
+    const hasContract = normalizeCsvText(row?.["Status contrato"]) !== ""
     const hasValue = parseCurrencyLike(row?.["Valor contrato"] || row?.["Valor do contrato"]) > 0
 
     return filled * 2 + (hasStatus ? 3 : 0) + (hasContract ? 4 : 0) + (hasValue ? 2 : 0)
@@ -168,11 +168,12 @@ function choosePreferredRow(existingRow, incomingRow) {
 
 function inferSheetRole(row) {
     const statusText = normalizeCsvText(row?.Status)
+    const contractStatusText = normalizeCsvText(row?.["Status contrato"])
     const contractText = normalizeCsvText(row?.["Contrato Gerado"] || row?.Contrato)
     const valueText = normalizeCsvText(row?.["Valor contrato"] || row?.["Valor do plano"] || row?.Valor)
     const activationText = normalizeCsvText(row?.["Data ativação"] || row?.["Data de ativação"] || row?.["Data ativacao"])
 
-    if (contractText || valueText || activationText) return "contract"
+    if (contractText || valueText || activationText || contractStatusText) return "contract"
     if (statusText) return "prospect"
     return "unknown"
 }
@@ -250,8 +251,16 @@ function normalizeRowHeaders(row = {}) {
     const normalized = { ...row }
 
     const fieldMap = [
+        [COLUMN_MAP.razao, ["Razão", "Razao", "Razão social", "Razao social", "Razão social/nome", "Razao social/nome"]],
+        [COLUMN_MAP.statusContrato, ["Status contrato", "Status do contrato", "Status Contrato"]],
+        [COLUMN_MAP.latitudeProspect, ["Latitude Prospect", "Latitude do prospect"]],
+        [COLUMN_MAP.longitudeProspect, ["Longitude Prospect", "Longitude do prospect"]],
+        [COLUMN_MAP.latitude, ["Latitude"]],
+        [COLUMN_MAP.longitude, ["Longitude"]],
+        [COLUMN_MAP.cep, ["CEP", "Cep"]],
         [COLUMN_MAP.canal, ["Canal de venda", "Canal", "Canal de venda "]],
         [COLUMN_MAP.campanha, ["Campanha de venda", "Campanha", "Campanha de venda "]],
+        [COLUMN_MAP.campanhaInstalacao, ["Campanha de instalação", "Campanha de instalacao"]],
         [COLUMN_MAP.vendedor, ["Vendedor", "Vendedor Prospect", "Vendedor prospect", "Vendedor do prospect", "Vendedor Comercia", "Vendedor comercial", "Vendedor Contrato", "Vendedor do contrato", "Consultor"]],
         [COLUMN_MAP.status, ["Status", "status"]],
         [COLUMN_MAP.motivoPerda, ["Motivo perdemos", "Motivo", "Motivo de perda", "Descrição", "Descricao"]],
@@ -260,7 +269,11 @@ function normalizeRowHeaders(row = {}) {
         [COLUMN_MAP.dataAtivacao, ["Data ativação", "Data de ativação", "Data ativacao", "Data de ativacao", "Data Ativação", "Data Ativacao"]],
         [COLUMN_MAP.contrato, ["Contrato Gerado", "Contrato", "Contrato gerado"]],
         [COLUMN_MAP.valorContrato, ["Valor contrato", "Valor do plano", "Valor do contrato", "Valor"]],
-        [COLUMN_MAP.taxaAtivacao, ["Taxa de ativação", "Taxa de ativacao", "Taxa de ativacao ", "Taxa ativação"]]
+        [COLUMN_MAP.taxaAtivacao, ["Taxa de ativação", "Taxa de ativacao", "Taxa de ativacao ", "Taxa ativação"]],
+        [COLUMN_MAP.descricaoCancelamento, ["Descrição do cancelamento", "Descricao do cancelamento"]],
+        [COLUMN_MAP.dataCancelamento, ["Data do cancelamento", "Data do cancelamento "]],
+        [COLUMN_MAP.descricaoDesistencia, ["Descrição da desistência", "Descricao da desistência", "Descrição da desistencia", "Descricao da desistencia"]],
+        [COLUMN_MAP.dataDesistencia, ["Data da desistência", "Data da desistencia"]]
     ]
 
     fieldMap.forEach(([targetKey, aliases]) => {

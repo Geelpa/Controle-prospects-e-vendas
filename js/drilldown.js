@@ -4,6 +4,11 @@ const DRILLDOWN_TITLES = {
     won: "Prospects vencidos",
     lost: "Prospects perdidos",
     noViability: "Prospects sem viabilidade",
+    preContract: "Contratos em pré-contrato",
+    inactive: "Contratos inativos",
+    withdrawn: "Contratos desistidos",
+    cancelled: "Contratos cancelados",
+    taxPaid: "Clientes com taxa de ativação",
     installationPaid: "Vendas com taxa paga",
     installationFree: "Vendas com taxa isenta"
 }
@@ -29,21 +34,19 @@ const LIST_COLUMN_CANDIDATES = [
     "Telefone",
     "Celular",
     COLUMN_MAP.status,
-    COLUMN_MAP.contrato,
+    COLUMN_MAP.statusContrato,
+    COLUMN_MAP.cep,
     COLUMN_MAP.motivoPerda,
     COLUMN_MAP.vendedor,
     COLUMN_MAP.plano,
     COLUMN_MAP.canal,
     COLUMN_MAP.campanha,
+    COLUMN_MAP.campanhaInstalacao,
     COLUMN_MAP.data,
     COLUMN_MAP.dataAtivacao,
-    "Data do cadastro",
-    "Data de cadastro",
-    "Data cadastro",
-    "Data de ativação",
-    "Data de ativacao",
-    "Data ativação",
-    "Data ativacao",
+    COLUMN_MAP.taxaAtivacao,
+    COLUMN_MAP.dataCancelamento,
+    COLUMN_MAP.dataDesistencia,
     "Ativação",
     "Ativacao"
 ]
@@ -94,6 +97,9 @@ function getHiddenColumnsByDrilldownType(type) {
         hiddenColumns.push(COLUMN_MAP.status)
         hiddenColumns.push("Status")
     }
+    hiddenColumns.push(COLUMN_MAP.contrato)
+    hiddenColumns.push("Contrato Gerado")
+    hiddenColumns.push("Contrato")
 
     // 2. Ocultar PLANO se o clique veio de um contexto de perda ou andamento
     if (!isWonContext && !isInstallation) {
@@ -154,8 +160,19 @@ function getRowsByDrilldownType(type) {
         )
     }
 
+    if (type === "inactive") {
+        return rows.filter(isInactiveContract)
+    }
+    if (["preContract", "withdrawn", "cancelled"].includes(type)) {
+        return rows.filter(item => getContractStatusCategory(item) === type)
+    }
+
     if (type === "installationPaid") {
         return getUniqueWonRows(rows).filter(item => !isFreeInstallation(item))
+    }
+
+    if (type === "taxPaid") {
+        return rows.filter(item => parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0)
     }
 
     if (type === "installationFree") {
@@ -300,7 +317,7 @@ function getListColumns(rows) {
     }
 
     const availableColumns =
-        Object.keys(rows[0])
+        Array.from(new Set(rows.flatMap(row => Object.keys(row || {}))))
 
     const selectedColumns =
         LIST_COLUMN_CANDIDATES
@@ -314,8 +331,24 @@ function getListColumns(rows) {
                 columns.indexOf(column) === index
             )
 
-    return selectedColumns.length
-        ? selectedColumns
+    const hasRazao = selectedColumns.some(column =>
+        normalize(column) === normalize("Razão")
+    )
+    const razaoSocialAliases = [
+        "Razão social",
+        "Razao social",
+        "Razão Social",
+        "Razao Social",
+        "Razão social/nome"
+    ]
+    const visibleColumns = hasRazao
+        ? selectedColumns.filter(column => !razaoSocialAliases.some(alias =>
+            normalize(column) === normalize(alias)
+        ))
+        : selectedColumns
+
+    return visibleColumns.length
+        ? visibleColumns
         : availableColumns.slice(0, 8)
 }
 
