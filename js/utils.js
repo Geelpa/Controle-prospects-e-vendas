@@ -20,12 +20,12 @@ function applyBusinessRules(row) {
     const canalCol = findColumnName(row, COLUMN_MAP.canal)
     const campCol = findColumnName(row, COLUMN_MAP.campanha)
     const statusCol = findColumnName(row, COLUMN_MAP.status)
-    const contractCol = findColumnName(row, COLUMN_MAP.contrato)
+    const contractStatusCol = findColumnName(row, COLUMN_MAP.statusContrato)
 
     const canalVal = canalCol ? String(row[canalCol] || "").trim() : ""
     const campVal = campCol ? String(row[campCol] || "").trim() : ""
     const statusVal = statusCol ? String(row[statusCol] || "").trim() : ""
-    const contractVal = contractCol ? String(row[contractCol] || "").trim() : ""
+    const contractStatusVal = contractStatusCol ? String(row[contractStatusCol] || "").trim() : ""
 
     // Normalizar canais vagos/sem resposta para 'Outros'
     const canalNormalize = normalize(canalVal)
@@ -54,7 +54,7 @@ function applyBusinessRules(row) {
     }
 
     // Rule: se status estiver como 'novo' e contrato ativo, ajustar status para 'Vencemos'
-    const hasContractActive = contractVal !== "" && contractVal !== "-"
+    const hasContractActive = contractStatusVal !== "" && contractStatusVal !== "-"
     if (statusVal && normalize(statusVal) === "novo" && hasContractActive && statusCol) {
         newRow[statusCol] = "Vencemos"
     }
@@ -191,8 +191,8 @@ function getBusinessDateForRow(row) {
     ) || (
         normalize(String(row?.[COLUMN_MAP.status] || "")) === "vencemos"
     ) || (
-        String(row?.[COLUMN_MAP.contrato] || "").trim() !== "" &&
-        String(row?.[COLUMN_MAP.contrato] || "").trim() !== "-"
+        String(row?.[COLUMN_MAP.statusContrato] || "").trim() !== "" &&
+        String(row?.[COLUMN_MAP.statusContrato] || "").trim() !== "-"
     )
 
     if (hasActivationDate && hasWonSignal) {
@@ -211,7 +211,8 @@ function resolveSellerDisplayName(value) {
         return ""
     }
 
-    return SELLER_MAP[rawValue] || SELLER_MAP[String(rawValue).replace(/^0+/, "")] || rawValue
+    // Os CSVs atuais já fornecem o nome completo do vendedor.
+    return rawValue
 }
 
 // Normaliza nomes de plano para evitar variações que representam a mesma configuração

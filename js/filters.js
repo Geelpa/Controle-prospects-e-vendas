@@ -5,6 +5,15 @@ function populateFilters(data) {
     populateYearFilter(data)
 }
 
+function matchesGlobalSearch(item, query) {
+    const normalizedQuery = normalize(query)
+    if (!normalizedQuery || normalizedQuery === "todos") return true
+
+    return Object.entries(item || {}).some(([key, value]) =>
+        normalize(`${key} ${value}`).includes(normalizedQuery)
+    )
+}
+
 function populateSellerFilter(data) {
 
     const select = document.getElementById("sellerFilter")
@@ -44,8 +53,8 @@ function populateSellerFilter(data) {
             STATUS.inProgress.includes(status)
         )
 
-        const contractValue = String(item?.[COLUMN_MAP.contrato] || item?.["Contrato Gerado"] || item?.Contrato || "").trim()
-        const hasContract = contractValue !== "" && contractValue !== "-"
+        const contractStatus = String(item?.[COLUMN_MAP.statusContrato] || "").trim()
+        const hasContract = contractStatus !== "" && contractStatus !== "-"
 
         const hasRevenue = parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato] || item?.["Valor contrato"] || item?.["Valor do contrato"] || 0) > 0
 
@@ -194,6 +203,8 @@ function applyFilters() {
 
     const year =
         document.getElementById("yearFilter").value
+    const globalSearch =
+        document.getElementById("globalSearch")?.value || ""
     const salesViewFilter =
         document.getElementById("salesViewFilter")
 
@@ -207,6 +218,7 @@ function applyFilters() {
     // 2) salesFilteredData: used for wins/activations/charts (based on business/activation date)
 
     const prospectFilteredData = rawData.filter(item => {
+        if (!matchesGlobalSearch(item, globalSearch)) return false
         // seller match
         const sellerMatch =
             seller === "all" ||
@@ -229,6 +241,7 @@ function applyFilters() {
     })
 
     const salesFilteredData = rawData.filter(item => {
+        if (!matchesGlobalSearch(item, globalSearch)) return false
         // seller match
         const sellerMatch =
             seller === "all" ||
@@ -390,3 +403,7 @@ document
 document
     .getElementById("weekFilter")
     .addEventListener("change", applyFilters)
+
+document
+    .getElementById("globalSearch")
+    .addEventListener("input", applyFilters)

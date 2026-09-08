@@ -57,6 +57,15 @@ function processData(prospectData, salesData) {
         STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
     ).length;
 
+    const contractStatusRows = salesData || [];
+    const countContractCategory = category => contractStatusRows.filter(item =>
+        getContractStatusCategory(item) === category
+    ).length;
+    const preContract = countContractCategory("preContract");
+    const inactive = contractStatusRows.filter(isInactiveContract).length;
+    const withdrawn = countContractCategory("withdrawn");
+    const cancelled = countContractCategory("cancelled");
+
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
     const inProgress = prospectsData.filter(item => {
         const s = normalize(item[COLUMN_MAP.status]);
@@ -129,6 +138,10 @@ function processData(prospectData, salesData) {
         lost,
         noViability,
         inProgress,
+        preContract,
+        inactive,
+        withdrawn,
+        cancelled,
         conversion,
         averageTicket,
         totalTaxPaid: formattedTaxRevenue
@@ -543,6 +556,20 @@ function renderProspectTable(rows, options = {}) {
         );
     });
 
+    const conditionalColumns = [
+        COLUMN_MAP.dataCancelamento,
+        COLUMN_MAP.dataDesistencia
+    ];
+    const hasContractDetail = column => displayRows.some(row =>
+        hasMeaningfulContractField(row[column])
+    );
+    conditionalColumns.forEach(column => {
+        if (!hasContractDetail(column)) {
+            const index = columns.indexOf(column);
+            if (index >= 0) columns.splice(index, 1);
+        }
+    });
+
     columns.forEach(column => {
         const cell = document.createElement("th");
         cell.className = "p-4 text-left text-white whitespace-normal";
@@ -574,11 +601,18 @@ function getRowsByDrilldownType(type) {
     if (type === "inProgress") return prospectRows.filter(item => STATUS.inProgress.includes(normalize(item?.[COLUMN_MAP.status])));
     if (type === "lost") return prospectRows.filter(item => STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status])));
     if (type === "noViability") return prospectRows.filter(item => STATUS.noViability.includes(normalize(item?.[COLUMN_MAP.status])));
+    if (type === "inactive") {
+        return salesRows.filter(isInactiveContract);
+    }
+    if (["preContract", "withdrawn", "cancelled"].includes(type)) {
+        return salesRows.filter(item => getContractStatusCategory(item) === type);
+    }
 
     // Sales/activation-related drilldowns use the sales/activation dataset
     if (type === "won") return getUniqueWonRows(salesRows);
     if (type === "installationPaid") return getUniqueWonRows(salesRows).filter(item => !isFreeInstallation(item));
     if (type === "installationFree") return getUniqueWonRows(salesRows).filter(item => isFreeInstallation(item));
+    if (type === "taxPaid") return salesRows.filter(item => parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0);
 
     return [];
 }
@@ -666,7 +700,13 @@ function getListColumns(rows) {
         .filter(Boolean)
         .filter((column, index, columns) => columns.indexOf(column) === index);
 
-    return selectedColumns.length ? selectedColumns : availableColumns.slice(0, 8);
+    const hasRazao = selectedColumns.some(column => normalize(column) === normalize("Razão"));
+    const razaoSocialAliases = ["Razão social", "Razao social", "Razão Social", "Razao Social", "Razão social/nome"];
+    const visibleColumns = hasRazao
+        ? selectedColumns.filter(column => !razaoSocialAliases.some(alias => normalize(column) === normalize(alias)))
+        : selectedColumns;
+
+    return visibleColumns.length ? visibleColumns : availableColumns.slice(0, 8);
 }
 
 function getColumnLabel(column) {
