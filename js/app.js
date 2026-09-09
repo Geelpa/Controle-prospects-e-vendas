@@ -150,7 +150,8 @@ function processData(prospectData, salesData) {
     // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
         logDashboardAudit(salesData || [], prospectsData, isNewProspect);
-    } catch (e) { /** não quebrar a execução */ }     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
+    } catch (e) { /** não quebrar a execução */ }
+     // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
     // Isso evita usar { ...item } e quebrar a leitura da planilha!
     const getSellersName = (item) => {
@@ -172,7 +173,19 @@ function processData(prospectData, salesData) {
     if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
     if (typeof createPlansChart === "function") createPlansChart(chartDataWithCorrectSellers);
     if (typeof createInstallationChart === "function") createInstallationChart(chartDataWithCorrectSellers);
-    if (typeof createSalesPerDayChart === "function") createSalesPerDayChart(chartDataWithCorrectSellers);
+    if (typeof createSalesPerDayChart === "function") {
+        const resultChartRows = [
+            ...(salesData || []).filter(item =>
+                STATUS.won.includes(normalize(item?.[COLUMN_MAP.status]))
+            ),
+            ...(prospectsData || []).filter(item => {
+                const status = normalize(item?.[COLUMN_MAP.status])
+                return STATUS.won.includes(status) || isLossStatus(item)
+            })
+        ];
+
+        createSalesPerDayChart(resultChartRows, prospectsData);
+    }
 
     // Gráficos de funil e comparação de status continuam na base completa filtrada (vendas/ativação).
     if (typeof createChannelsChart === "function") createChannelsChart(salesData || []);
@@ -242,15 +255,17 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
         duplicateIds: duplicateIdReport.duplicates
     };
 
-    console.group("Auditoria Dashboard Comercial");
-    console.table(
-        Object.entries(report)
-            .map(([chave, valor]) => ({ chave, valor }))
-    );
-    console.log("Status apos filtros de cadastro:", statusCounts);
-    console.log("Status dos prospects contados:", prospectStatusCounts);
-    console.log("window.dashboardAudit", window.dashboardAudit);
-    console.groupEnd();
+    if (window.DASHBOARD_DEBUG === true) {
+        console.groupCollapsed("Auditoria Dashboard Comercial");
+        console.table(
+            Object.entries(report)
+                .map(([chave, valor]) => ({ chave, valor }))
+        );
+        console.log("Status apos filtros de cadastro:", statusCounts);
+        console.log("Status dos prospects contados:", prospectStatusCounts);
+        console.log("window.dashboardAudit", window.dashboardAudit);
+        console.groupEnd();
+    }
 }
 
 function countBy(rows, getKey) {

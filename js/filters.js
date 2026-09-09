@@ -205,14 +205,6 @@ function applyFilters() {
         document.getElementById("yearFilter").value
     const globalSearch =
         document.getElementById("globalSearch")?.value || ""
-    const salesViewFilter =
-        document.getElementById("salesViewFilter")
-
-    if (salesViewFilter) {
-        salesViewFilter.dataset.autoMode =
-            month === "all" ? "month" : "week"
-    }
-
     // Build two filtered datasets:
     // 1) prospectFilteredData: used for prospect KPIs (based on registration date)
     // 2) salesFilteredData: used for wins/activations/charts (based on business/activation date)
@@ -263,61 +255,47 @@ function applyFilters() {
         return monthMatch && yearMatch
     })
 
-    updateSalesChartFilters(salesFilteredData, month)
+    updateSalesChartFilters([
+        ...salesFilteredData,
+        ...prospectFilteredData
+    ], month)
 
     processData(prospectFilteredData, salesFilteredData)
 }
 
 function updateSalesChartFilters(data, selectedMonth) {
-    const salesViewFilter =
-        document.getElementById("salesViewFilter")
+    const viewFilter = document.getElementById("salesViewFilter")
+    const weekFilter = document.getElementById("weekFilter")
+    const title = document.getElementById("salesChartTitle")
 
-    const weekFilter =
-        document.getElementById("weekFilter")
-
-    const salesChartTitle =
-        document.getElementById("salesChartTitle")
-
-    if (!salesViewFilter || !weekFilter) return
+    if (!viewFilter || !weekFilter) return
 
     if (selectedMonth === "all") {
-        salesViewFilter.value = "month"
-        salesViewFilter.disabled = true
+        viewFilter.value = "month"
+        viewFilter.disabled = true
         weekFilter.classList.add("hidden")
         weekFilter.value = "all"
-
-        if (salesChartTitle) {
-            salesChartTitle.textContent = "Ativações por Mês"
-        }
-
+        if (title) title.textContent = "Resultados por Mês"
         return
     }
 
-    if (salesViewFilter.dataset.autoMode === "week") {
-        salesViewFilter.value = "week"
+    if (viewFilter.value === "month") {
+        viewFilter.value = "week"
     }
 
-    salesViewFilter.disabled = false
+    viewFilter.disabled = false
 
-    if (salesViewFilter.value === "month") {
+    if (viewFilter.value === "week") {
         weekFilter.classList.add("hidden")
         weekFilter.value = "all"
-
-        if (salesChartTitle) {
-            salesChartTitle.textContent = "Ativações por Mês"
-        }
-
+        if (title) title.textContent = "Resultados por Semana"
         return
     }
 
     populateWeekFilter(data)
     weekFilter.classList.remove("hidden")
-
-    if (salesChartTitle) {
-        salesChartTitle.textContent =
-            weekFilter.value === "all"
-                ? "Ativações por Semana"
-                : "Ativações por Dia"
+    if (title) {
+        title.textContent = "Resultados por Dia"
     }
 }
 
@@ -331,27 +309,23 @@ function populateWeekFilter(data) {
     weekFilter.innerHTML =
         '<option value="all">Todas as semanas</option>'
 
-    const weekStarts = [
-        ...new Set(
-            data
-                .filter(item =>
-                    STATUS.won.includes(
-                        normalize(item[COLUMN_MAP.status])
-                    )
-                )
-                .map(item => {
-                    const parsedDate =
-                        extractActivationDate(item)
+    const weekStarts = new Set()
 
-                    if (!parsedDate) return null
+    data.forEach(item => {
+        const status = normalize(item[COLUMN_MAP.status])
+        const parsedDate = STATUS.won.includes(status)
+            ? extractActivationDate(item)
+            : isLossStatus(item)
+                ? extractRegistrationDate(item)
+                : null
 
-                    return formatDateKey(getWeekStart(parsedDate))
-                })
-                .filter(Boolean)
-        )
-    ].sort((a, b) => parseDateKey(a) - parseDateKey(b))
+        if (parsedDate) weekStarts.add(formatDateKey(getWeekStart(parsedDate)))
+    })
 
-    weekStarts.forEach(weekStart => {
+    const sortedWeekStarts = [...weekStarts]
+        .sort((a, b) => parseDateKey(a) - parseDateKey(b))
+
+    sortedWeekStarts.forEach(weekStart => {
         const startDate = parseDateKey(weekStart)
         const endDate = parseDateKey(weekStart)
 

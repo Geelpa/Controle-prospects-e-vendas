@@ -721,12 +721,12 @@ function mainDateFiltersSelected() {
     return month && year && month !== "all" && year !== "all"
 }
 
-function getSalesChartState() {
+function getSalesChartState(prefix = "sales") {
     const salesViewFilter =
-        document.getElementById("salesViewFilter")
+        document.getElementById(`${prefix}ViewFilter`)
 
     const weekFilter =
-        document.getElementById("weekFilter")
+        document.getElementById(`${prefix}WeekFilter`)
 
     return {
         view: salesViewFilter?.value || "month",
@@ -770,8 +770,7 @@ function parseDateKey(key) {
     return new Date(year, month - 1, day)
 }
 
-function getSalesDateKey(date) {
-    const state = getSalesChartState()
+function getSalesDateKey(date, state = getSalesChartState()) {
 
     if (state.view === "month") {
         const month =
@@ -784,11 +783,11 @@ function getSalesDateKey(date) {
     const weekStart =
         formatDateKey(getWeekStart(date))
 
-    if (state.week === "all") {
+    if (state.view === "week") {
         return weekStart
     }
 
-    if (state.week !== weekStart) {
+    if (state.week !== "all" && state.week !== weekStart) {
         return null
     }
 
@@ -803,7 +802,7 @@ function sortSalesDateKeys(first, second) {
     return parseDateKey(first) - parseDateKey(second)
 }
 
-function formatSalesDateLabel(key) {
+function formatSalesDateLabel(key, state = getSalesChartState()) {
     if (key.length === 7) {
         const [year, month] = key.split("-")
 
@@ -811,9 +810,7 @@ function formatSalesDateLabel(key) {
     }
 
     const [year, month, day] = key.split("-")
-    const state = getSalesChartState()
-
-    if (state.view === "week" && state.week === "all") {
+    if (state.view === "week") {
         const weekStart = parseDateKey(key)
         const weekEnd = parseDateKey(key)
 
@@ -911,7 +908,7 @@ function createLossReasonsChart(data) {
     )
 }
 
-function createSalesPerDayChart(data) {
+function createLegacySalesPerDayChart(data) {
 
     destroyChart(salesPerDayChart)
 
@@ -1053,6 +1050,415 @@ function createSalesPerDayChart(data) {
                 }
             },
             plugins: [emptyStatePlugin, doughnutValueLabelsPlugin]
+        }
+    )
+}
+
+function createLegacyLossesPerDayChart(data) {
+
+    destroyChart(lossesPerDayChart)
+
+    const chartState = getSalesChartState("losses")
+
+    if (!mainDateFiltersSelected()) {
+        toggleChartCard("lossesPerDayChartCard", false)
+        return
+    }
+
+    const lossRows = data.filter(item => isLossStatus(item))
+    const grouped = {}
+
+    lossRows.forEach(item => {
+        const parsedDate = extractRegistrationDate(item)
+
+        if (!parsedDate) return
+
+        const key = getSalesDateKey(parsedDate, chartState)
+
+        if (!key) return
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                lost: 0,
+                noViability: 0
+            }
+        }
+
+        if (isNoViabilityStatus(item)) {
+            grouped[key].noViability++
+        } else {
+            grouped[key].lost++
+        }
+    })
+
+    const sortedEntries = Object.entries(grouped)
+        .sort((a, b) => sortSalesDateKeys(a[0], b[0]))
+
+    if (sortedEntries.length < 2) {
+        toggleChartCard("lossesPerDayChartCard", false)
+        return
+    }
+
+    toggleChartCard("lossesPerDayChartCard", true)
+
+    const labels = sortedEntries.map(([date]) => formatSalesDateLabel(date, chartState))
+
+    lossesPerDayChart = new Chart(
+        document.getElementById("lossesPerDayChart"),
+        {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "Perdemos",
+                        data: sortedEntries.map(([_, values]) => values.lost),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.rose,
+                        backgroundColor: CHART_COLORS.rose,
+                        pointBackgroundColor: CHART_COLORS.rose,
+                        pointBorderColor: CHART_COLORS.rose,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Sem viabilidade",
+                        data: sortedEntries.map(([_, values]) => values.noViability),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.gray,
+                        backgroundColor: CHART_COLORS.gray,
+                        pointBackgroundColor: CHART_COLORS.gray,
+                        pointBorderColor: CHART_COLORS.gray,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                ...baseOptions(),
+                onClick(event, elements) {
+                    if (!elements.length) return
+
+                    const key = sortedEntries[elements[0].index]?.[0]
+
+                    if (!key) return
+
+                    const rows = lossRows.filter(item => {
+                        const parsedDate = extractRegistrationDate(item)
+                        return parsedDate && getSalesDateKey(parsedDate, chartState) === key
+                    })
+
+                    openChartRows(
+                        `Perdas em ${formatSalesDateLabel(key, chartState)}`,
+                        rows
+                    )
+                },
+                onHover(event, elements) {
+                    event.native.target.style.cursor =
+                        elements.length ? "pointer" : "default"
+                },
+                plugins: {
+                    ...baseOptions().plugins,
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: {
+                            color: CHART_COLORS.text,
+                            usePointStyle: true,
+                            pointStyle: "circle",
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            padding: 12,
+                            font: {
+                                size: 12,
+                                weight: "600"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        ...baseOptions().plugins.tooltip,
+                        callbacks: {
+                            label(context) {
+                                return `${context.dataset.label}: ${context.parsed.y}`
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: CHART_COLORS.muted,
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 7
+                        },
+                        grid: {
+                            display: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            color: CHART_COLORS.muted
+                        },
+                        grid: {
+                            color: CHART_COLORS.grid,
+                            drawBorder: false
+                        },
+                        border: {
+                            display: false
+                        }
+                    }
+                }
+            },
+            plugins: [emptyStatePlugin]
+        }
+    )
+}
+
+function createSalesPerDayChart(data, prospectRows = []) {
+
+    destroyChart(salesPerDayChart)
+
+    const chartState = getSalesChartState()
+
+    const uniqueData = []
+    const uniqueKeys = new Set()
+
+    data.forEach(item => {
+        const status = normalize(item?.[COLUMN_MAP.status])
+        const statusKey = STATUS.won.includes(status)
+            ? "won"
+            : isNoViabilityStatus(item)
+                ? "noViability"
+                : isLostStatus(item)
+                    ? "lost"
+                    : status
+        const uniqueKey = `${statusKey}:${getChartDedupKey(item)}`
+
+        if (uniqueKeys.has(uniqueKey)) return
+
+        uniqueKeys.add(uniqueKey)
+        uniqueData.push(item)
+    })
+    const grouped = {}
+    const rowsByPeriod = {}
+
+    const uniqueProspects = getDeduplicatedChartRows(prospectRows)
+
+    uniqueProspects.forEach(item => {
+        const parsedDate = extractRegistrationDate(item)
+        if (!parsedDate) return
+
+        const key = getSalesDateKey(parsedDate, chartState)
+        if (!key) return
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                prospects: 0,
+                won: 0,
+                lost: 0,
+                noViability: 0
+            }
+            rowsByPeriod[key] = []
+        }
+
+        grouped[key].prospects++
+        rowsByPeriod[key].push(item)
+    })
+
+    uniqueData.forEach(item => {
+        const status = normalize(item?.[COLUMN_MAP.status])
+        const isWonRow = STATUS.won.includes(status)
+        const isLostRow = isLossStatus(item)
+
+        if (!isWonRow && !isLostRow) return
+
+        const parsedDate = isWonRow
+            ? extractActivationDate(item)
+            : extractRegistrationDate(item)
+
+        if (!parsedDate) return
+
+        const key = getSalesDateKey(parsedDate, chartState)
+        if (!key) return
+
+        if (!grouped[key]) {
+            grouped[key] = {
+                prospects: 0,
+                won: 0,
+                lost: 0,
+                noViability: 0
+            }
+            rowsByPeriod[key] = []
+        }
+
+        if (isWonRow) {
+            grouped[key].won++
+        } else if (isNoViabilityStatus(item)) {
+            grouped[key].noViability++
+        } else {
+            grouped[key].lost++
+        }
+
+        rowsByPeriod[key].push(item)
+    })
+
+    const sortedEntries = Object.entries(grouped)
+        .sort((a, b) => sortSalesDateKeys(a[0], b[0]))
+
+    if (!sortedEntries.length) {
+        toggleChartCard("salesPerDayChartCard", false)
+        return
+    }
+
+    toggleChartCard("salesPerDayChartCard", true)
+
+    const labels = sortedEntries.map(([date]) =>
+        formatSalesDateLabel(date, chartState)
+    )
+
+    salesPerDayChart = new Chart(
+        document.getElementById("salesPerDayChart"),
+        {
+            type: "line",
+            data: {
+                labels,
+                datasets: [
+                    {
+                        label: "Prospectados",
+                        data: sortedEntries.map(([_, values]) => values.prospects),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.blue,
+                        backgroundColor: CHART_COLORS.blue,
+                        pointBackgroundColor: CHART_COLORS.blue,
+                        pointBorderColor: CHART_COLORS.blue,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Vencemos",
+                        data: sortedEntries.map(([_, values]) => values.won),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.emerald,
+                        backgroundColor: CHART_COLORS.emerald,
+                        pointBackgroundColor: CHART_COLORS.emerald,
+                        pointBorderColor: CHART_COLORS.emerald,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Perdemos",
+                        data: sortedEntries.map(([_, values]) => values.lost),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.rose,
+                        backgroundColor: CHART_COLORS.rose,
+                        pointBackgroundColor: CHART_COLORS.rose,
+                        pointBorderColor: CHART_COLORS.rose,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
+                    {
+                        label: "Sem viabilidade",
+                        data: sortedEntries.map(([_, values]) => values.noViability),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.gray,
+                        backgroundColor: CHART_COLORS.gray,
+                        pointBackgroundColor: CHART_COLORS.gray,
+                        pointBorderColor: CHART_COLORS.gray,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    }
+                ]
+            },
+            options: {
+                ...baseOptions(),
+                onClick(event, elements) {
+                    if (!elements.length) return
+
+                    const key = sortedEntries[elements[0].index]?.[0]
+                    if (!key) return
+
+                    openChartRows(
+                        `Resultados em ${formatSalesDateLabel(key, chartState)}`,
+                        rowsByPeriod[key] || []
+                    )
+                },
+                onHover(event, elements) {
+                    event.native.target.style.cursor =
+                        elements.length ? "pointer" : "default"
+                },
+                plugins: {
+                    ...baseOptions().plugins,
+                    legend: {
+                        display: true,
+                        position: "top",
+                        align: "end",
+                        labels: {
+                            color: CHART_COLORS.text,
+                            usePointStyle: true,
+                            pointStyle: "circle",
+                            boxWidth: 8,
+                            boxHeight: 8,
+                            padding: 12,
+                            font: {
+                                size: 12,
+                                weight: "600"
+                            }
+                        }
+                    },
+                    tooltip: {
+                        ...baseOptions().plugins.tooltip,
+                        callbacks: {
+                            label(context) {
+                                return `${context.dataset.label}: ${context.parsed.y}`
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ticks: {
+                            color: CHART_COLORS.muted,
+                            maxRotation: 0,
+                            autoSkip: true,
+                            maxTicksLimit: 7
+                        },
+                        grid: { display: false },
+                        border: { display: false }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0,
+                            color: CHART_COLORS.muted
+                        },
+                        grid: {
+                            color: CHART_COLORS.grid,
+                            drawBorder: false
+                        },
+                        border: { display: false }
+                    }
+                }
+            },
+            plugins: [emptyStatePlugin]
         }
     )
 }

@@ -218,7 +218,9 @@ function mergeCsvRows(rows) {
         detectedByRole: byRole
     }
 
-    console.log("window.csvMergeAudit", window.csvMergeAudit)
+    if (window.DASHBOARD_DEBUG === true) {
+        console.log("window.csvMergeAudit", window.csvMergeAudit)
+    }
 
     return Array.from(mergedMap.values())
 }
