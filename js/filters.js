@@ -267,20 +267,28 @@ function updateSalesChartFilters(data, selectedMonth) {
     const viewFilter = document.getElementById("salesViewFilter")
     const weekFilter = document.getElementById("weekFilter")
     const title = document.getElementById("salesChartTitle")
+    const monthOption = viewFilter?.querySelector('option[value="month"]')
+    const weekOption = viewFilter?.querySelector('option[value="week"]')
 
     if (!viewFilter || !weekFilter) return
 
     if (selectedMonth === "all") {
         viewFilter.value = "month"
         viewFilter.disabled = true
+        if (monthOption) monthOption.disabled = false
+        if (weekOption) weekOption.disabled = true
         weekFilter.classList.add("hidden")
         weekFilter.value = "all"
         if (title) title.textContent = "Resultados por Mês"
         return
     }
 
+    if (monthOption) monthOption.disabled = true
+    if (weekOption) weekOption.disabled = false
+
+    // Ao sair da visão anual, começa por dia; depois preserva a escolha dia/semana.
     if (viewFilter.value === "month") {
-        viewFilter.value = "week"
+        viewFilter.value = "day"
     }
 
     viewFilter.disabled = false

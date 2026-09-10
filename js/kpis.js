@@ -4,7 +4,7 @@ function updateKPIs({
     lost,
     noViability,
     inProgress,
-    preContract,
+    alreadyClients,
     inactive,
     withdrawn,
     cancelled,
@@ -23,14 +23,20 @@ function updateKPIs({
 
     document.getElementById("lostDeals").innerText =
         lost
+    document.getElementById("lostDealsPercent").innerText =
+        `${getKpiPercent(lost, total)}% do total`
 
     document.getElementById("noViabilityDeals").innerText =
         noViability
+    document.getElementById("noViabilityDealsPercent").innerText =
+        `${getKpiPercent(noViability, total)}% do total`
 
     document.getElementById("inProgressDeals").innerText =
         inProgress
+    document.getElementById("inProgressDealsPercent").innerText =
+        `${getKpiPercent(inProgress, total)}% do total`
 
-    document.getElementById("preContractDeals").innerText = preContract
+    document.getElementById("alreadyClientsDeals").innerText = alreadyClients
     document.getElementById("inactiveDeals").innerText = inactive
     document.getElementById("withdrawnDeals").innerText = withdrawn
     document.getElementById("cancelledDeals").innerText = cancelled
@@ -40,4 +46,8 @@ function updateKPIs({
 
     document.getElementById("conversionRate").innerText =
         `${conversion}%`
+}
+
+function getKpiPercent(value, total) {
+    return total > 0 ? ((value / total) * 100).toFixed(1) : "0.0"
 }

@@ -20,19 +20,6 @@ function processData(prospectData, salesData) {
         return isNaN(result) ? 0 : result;
     };
 
-    // 2. FUNÇÃO AUXILIAR: Identifica e ignora movimentações de base
-    const isAdditionalPlan = (item) => {
-        const plano = normalize(item[COLUMN_MAP.plano] || "");
-        const campanha = normalize(item[COLUMN_MAP.campanha] || "");
-        const canal = normalize(item[COLUMN_MAP.canal] || "");
-
-        return ["adicional"].some(term =>
-            plano.includes(term) || campanha.includes(term) || canal.includes(term)
-        );
-    };
-
-    const isNewProspect = (item) => !isAdditionalPlan(item);
-
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
     const prospectsData = (prospectData || []).filter(item => isNewProspect(item, COLUMN_MAP));
@@ -45,6 +32,9 @@ function processData(prospectData, salesData) {
     // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
     const wonRows = getUniqueWonRows(salesData || []);
     const won = wonRows.length;
+    const alreadyClients = getUniqueWonRows(
+        (salesData || []).filter(item => isAdditionalPlan(item, COLUMN_MAP))
+    ).length;
     const salesPerformanceRows = wonRows.filter(item => !isOwnershipTransferChannel(item));
 
     // PERDEMOS: apenas status 'perdemos'
@@ -61,7 +51,6 @@ function processData(prospectData, salesData) {
     const countContractCategory = category => contractStatusRows.filter(item =>
         getContractStatusCategory(item) === category
     ).length;
-    const preContract = countContractCategory("preContract");
     const inactive = contractStatusRows.filter(isInactiveContract).length;
     const withdrawn = countContractCategory("withdrawn");
     const cancelled = countContractCategory("cancelled");
@@ -78,22 +67,16 @@ function processData(prospectData, salesData) {
     }).length;
 
     // Oportunidades trabalhadas: apenas aqueles com status 'vencemos' ou 'perdemos'
-    const workableSales = prospectsData.filter(item => {
-        const s = normalize(item[COLUMN_MAP.status]);
-        return STATUS.won.includes(s) || STATUS.lost.includes(s);
-    }).length;
-
-    const safeWorkableSales = workableSales < won ? won : workableSales;
+    const conversionBase = totalProspects - noViability;
 
     const conversion =
-        safeWorkableSales > 0
-            ? ((won / safeWorkableSales) * 100).toFixed(1)
+        conversionBase > 0
+            ? ((won / conversionBase) * 100).toFixed(1)
             : 0;
 
 
     // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
-    // Inclui vendas de planos adicionais como receita de contrato, mas continua tratando
-    // os adicionais como prospects existentes para o funil de novos prospects.
+    // Inclui vendas de planos adicionais como receita de contrato, sem somá-los aos prospects.
     let totalRevenue = 0;
     let totalTaxRevenue = 0;
     let validContractCount = 0;
@@ -138,7 +121,7 @@ function processData(prospectData, salesData) {
         lost,
         noViability,
         inProgress,
-        preContract,
+        alreadyClients,
         inactive,
         withdrawn,
         cancelled,
@@ -618,6 +601,11 @@ function getRowsByDrilldownType(type) {
     if (type === "noViability") return prospectRows.filter(item => STATUS.noViability.includes(normalize(item?.[COLUMN_MAP.status])));
     if (type === "inactive") {
         return salesRows.filter(isInactiveContract);
+    }
+    if (type === "alreadyClients") {
+        return getUniqueWonRows(
+            salesRows.filter(item => isAdditionalPlan(item, COLUMN_MAP))
+        );
     }
     if (["preContract", "withdrawn", "cancelled"].includes(type)) {
         return salesRows.filter(item => getContractStatusCategory(item) === type);

@@ -1252,6 +1252,20 @@ function createSalesPerDayChart(data, prospectRows = []) {
     })
     const grouped = {}
     const rowsByPeriod = {}
+    const rowKeysByPeriod = {}
+
+    const addRowToPeriod = (key, item) => {
+        if (!rowsByPeriod[key]) {
+            rowsByPeriod[key] = []
+            rowKeysByPeriod[key] = new Set()
+        }
+
+        const rowKey = getChartDedupKey(item)
+        if (rowKeysByPeriod[key].has(rowKey)) return
+
+        rowKeysByPeriod[key].add(rowKey)
+        rowsByPeriod[key].push(item)
+    }
 
     const uniqueProspects = getDeduplicatedChartRows(prospectRows)
 
@@ -1270,10 +1284,11 @@ function createSalesPerDayChart(data, prospectRows = []) {
                 noViability: 0
             }
             rowsByPeriod[key] = []
+            rowKeysByPeriod[key] = new Set()
         }
 
         grouped[key].prospects++
-        rowsByPeriod[key].push(item)
+        addRowToPeriod(key, item)
     })
 
     uniqueData.forEach(item => {
@@ -1300,6 +1315,7 @@ function createSalesPerDayChart(data, prospectRows = []) {
                 noViability: 0
             }
             rowsByPeriod[key] = []
+            rowKeysByPeriod[key] = new Set()
         }
 
         if (isWonRow) {
@@ -1310,7 +1326,7 @@ function createSalesPerDayChart(data, prospectRows = []) {
             grouped[key].lost++
         }
 
-        rowsByPeriod[key].push(item)
+        addRowToPeriod(key, item)
     })
 
     const sortedEntries = Object.entries(grouped)

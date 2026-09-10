@@ -24,8 +24,8 @@ const parseNumber = (value) => {
     return isNaN(result) ? 0 : result;
 };
 
-// 2. Identifica se é um prospect novo ou movimentação de base
-const isNewProspect = (item, map = COLUMN_MAP) => {
+// 2. Identifica se é um plano adicional ou um prospect novo
+const isAdditionalPlan = (item, map = COLUMN_MAP) => {
     if (!item || !map) return false;
 
     // Criamos uma mini função local de normalizar para garantir que nunca quebre por escopo
@@ -36,12 +36,13 @@ const isNewProspect = (item, map = COLUMN_MAP) => {
     const canal = localNormalize(item[map.canal]);
     const invalidTerms = ["adicional"];
 
-    // Plano adicional não é prospect novo, mas isso não impede que gere venda/contrato.
-    // Troca de titularidade continua sendo tratada como prospect, porque representa entrada de cliente novo.
-    return !invalidTerms.some(term =>
+    return invalidTerms.some(term =>
         plano.includes(term) || campanha.includes(term) || canal.includes(term)
     );
 };
+
+const isNewProspect = (item, map = COLUMN_MAP) =>
+    !isAdditionalPlan(item, map);
 
 // Uma venda é real quando o contrato está em um status válido e possui valor.
 const isRealWonSale = (item, COLUMN_MAP) => {

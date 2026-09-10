@@ -4,7 +4,7 @@ const DRILLDOWN_TITLES = {
     won: "Prospects vencidos",
     lost: "Prospects perdidos",
     noViability: "Prospects sem viabilidade",
-    preContract: "Contratos em pré-contrato",
+    alreadyClients: "Já clientes",
     inactive: "Contratos inativos",
     withdrawn: "Contratos desistidos",
     cancelled: "Contratos cancelados",
@@ -163,6 +163,10 @@ function getRowsByDrilldownType(type) {
     if (type === "inactive") {
         return rows.filter(isInactiveContract)
     }
+    if (type === "alreadyClients") {
+        return getUniqueWonRows(rows.filter(item => isAdditionalPlan(item, COLUMN_MAP)))
+    }
+
     if (["preContract", "withdrawn", "cancelled"].includes(type)) {
         return rows.filter(item => getContractStatusCategory(item) === type)
     }
