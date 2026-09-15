@@ -107,8 +107,8 @@ function getHiddenColumnsByDrilldownType(type) {
         hiddenColumns.push("Plano")
     }
 
-    // 3. Ocultar MOTIVO se o clique veio da parte verde (Vencemos) ou andamento
-    if (isWonContext || isInProgressContext || isNoViabilityContext || isInstallation) {
+    // 3. Ocultar MOTIVO apenas em contextos sem motivo, ou quando o contexto o trata separadamente
+    if (isWonContext || isInProgressContext || isInstallation) {
         hiddenColumns.push(COLUMN_MAP.motivoPerda)
         hiddenColumns.push("Motivo")
         hiddenColumns.push("Motivo de Perda")

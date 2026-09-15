@@ -53,6 +53,11 @@ function applyBusinessRules(row) {
         newRow[canalCol] = campVal || "Troca de Titularidade"
     }
 
+    if (isAdditionalPlan(row, COLUMN_MAP)) {
+        newRow[COLUMN_MAP.canal] = "Já foi cliente"
+        newRow[COLUMN_MAP.campanha] = "taxa isenta - sem descontos"
+    }
+
     // Rule: se status estiver como 'novo' e contrato ativo, ajustar status para 'Vencemos'
     const hasContractActive = contractStatusVal !== "" && contractStatusVal !== "-"
     if (statusVal && normalize(statusVal) === "novo" && hasContractActive && statusCol) {
@@ -73,23 +78,60 @@ function isOwnershipTransferChannel(row) {
         normalize(originChannel) === "troca de titularidade"
 }
 
-function parseCurrencyNumber(value) {
+function parseFlexibleNumber(value) {
     if (value === undefined || value === null) return 0
     if (typeof value === "number") return value
 
-    const cleanValue = String(value)
-        .replace(/[R$\s]/g, "")
-        .replace(/\./g, "")
-        .replace(",", ".")
+    let cleanValue = String(value).replace(/[R$\s]/g, "").trim()
+    const lastComma = cleanValue.lastIndexOf(",")
+    const lastDot = cleanValue.lastIndexOf(".")
+
+    if (lastComma >= 0 && lastDot >= 0) {
+        if (lastComma > lastDot) {
+            cleanValue = cleanValue.replace(/\./g, "").replace(",", ".")
+        } else {
+            cleanValue = cleanValue.replace(/,/g, "")
+        }
+    } else if (lastComma >= 0) {
+        cleanValue = cleanValue.replace(/\./g, "").replace(",", ".")
+    } else if ((cleanValue.match(/\./g) || []).length > 1) {
+        cleanValue = cleanValue.replace(/\./g, "")
+    } else if (lastDot >= 0 && cleanValue.split(".")[1].length === 3) {
+        cleanValue = cleanValue.replace(".", "")
+    }
 
     return parseFloat(cleanValue) || 0
+}
+
+function parseCurrencyNumber(value) {
+    return parseFlexibleNumber(value)
 }
 
 function parseDate(dateString) {
 
     if (!dateString) return null
 
+    if (dateString instanceof Date) {
+        return Number.isNaN(dateString.getTime()) ? null : dateString
+    }
+
     dateString = String(dateString).trim()
+
+    // Parseia datas ISO como data local para evitar que o fuso transforme 11/09 em 10/09.
+    const isoMatch = dateString.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T|\s)/)
+    if (isoMatch) {
+        const isoDate = new Date(
+            Number(isoMatch[1]),
+            Number(isoMatch[2]) - 1,
+            Number(isoMatch[3])
+        )
+
+        return isoDate.getFullYear() === Number(isoMatch[1]) &&
+            isoDate.getMonth() === Number(isoMatch[2]) - 1 &&
+            isoDate.getDate() === Number(isoMatch[3])
+            ? isoDate
+            : null
+    }
 
     const [datePart] =
         dateString.split(" ")
@@ -110,11 +152,24 @@ function parseDate(dateString) {
     const year =
         parseInt(parts[2], 10)
 
-    return new Date(
+    if (!Number.isInteger(day) || !Number.isInteger(month) || !Number.isInteger(year) ||
+        day < 1 || day > 31 || month < 0 || month > 11 || year < 1) {
+        return null
+    }
+
+    const parsedDate = new Date(
         year,
         month,
         day
     )
+
+    if (parsedDate.getFullYear() !== year ||
+        parsedDate.getMonth() !== month ||
+        parsedDate.getDate() !== day) {
+        return null
+    }
+
+    return parsedDate
 }
 
 function findColumnName(row, columnName, aliases = []) {
@@ -180,6 +235,32 @@ function extractActivationDate(row) {
     ])
 }
 
+function getModalDateValue(row) {
+    if (!row) return ""
+
+    const activationValue = getField(row, COLUMN_MAP.dataAtivacao, [
+        "Data ativação",
+        "Data de ativação",
+        "Data ativacao",
+        "Data de ativacao",
+        "Data Ativação",
+        "Data Ativacao"
+    ])
+
+    // No modal de vendas, a data de referência é a ativação, não o cadastro.
+    const isWonRow = (typeof isWon === "function" && isWon(row)) ||
+        normalize(String(row?.[COLUMN_MAP.status] || "")) === "vencemos"
+    if (isWonRow && extractActivationDate(row)) return activationValue
+
+    const registrationValue = getField(row, COLUMN_MAP.data, [
+        "Data do cadastro",
+        "Data cadastro"
+    ])
+    if (extractRegistrationDate(row)) return registrationValue
+
+    return extractActivationDate(row) ? activationValue : ""
+}
+
 function getBusinessDateForRow(row) {
     if (!row) return null
 
@@ -211,8 +292,16 @@ function resolveSellerDisplayName(value) {
         return ""
     }
 
-    // Os CSVs atuais já fornecem o nome completo do vendedor.
-    return rawValue
+    const nameParts = rawValue
+        .split(/\s+/)
+        .filter(Boolean)
+        .map(namePart => namePart.charAt(0).toUpperCase() + namePart.slice(1).toLowerCase())
+
+    if (nameParts.length <= 2) {
+        return rawValue
+    }
+
+    return `${nameParts[0]} ${nameParts[nameParts.length - 1]}`
 }
 
 // Normaliza nomes de plano para evitar variações que representam a mesma configuração
@@ -280,6 +369,19 @@ function getSellerValue(row) {
         return String(contractSeller).trim()
     }
 
+    const prospectSeller = getField(row, COLUMN_MAP.vendedorProspect, [
+        "Vendedor Prospect",
+        "Vendedor prospect",
+        "Vendedor do prospect"
+    ])
+    const normalizedStatus = normalize(String(row?.[COLUMN_MAP.status] || ""))
+    const hasWonContract = normalizedStatus === "vencemos" ||
+        String(row?.[COLUMN_MAP.statusContrato] || "").trim() !== ""
+
+    if (!hasWonContract && prospectSeller !== undefined && prospectSeller !== null && String(prospectSeller).trim() !== "" && String(prospectSeller).trim() !== "undefined") {
+        return String(prospectSeller).trim()
+    }
+
     const responsibleSeller = getField(row, COLUMN_MAP.vendedor, [
         "Vendedor",
         "Vendedor Prospect",
@@ -296,6 +398,10 @@ function getSellerValue(row) {
 
     if (responsibleSeller !== undefined && responsibleSeller !== null && String(responsibleSeller).trim() !== "" && String(responsibleSeller).trim() !== "undefined") {
         return String(responsibleSeller).trim()
+    }
+
+    if (prospectSeller !== undefined && prospectSeller !== null && String(prospectSeller).trim() !== "" && String(prospectSeller).trim() !== "undefined") {
+        return String(prospectSeller).trim()
     }
 
     return ""

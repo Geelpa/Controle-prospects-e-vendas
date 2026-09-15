@@ -35,7 +35,7 @@ function populateSellerFilter(data) {
             "Consultor"
         ])
 
-        const rawSeller = responsibleSeller ?? getSellerValue(item)
+        const rawSeller = getSellerValue(item) || responsibleSeller
 
         if (!rawSeller) return false
 
@@ -57,8 +57,11 @@ function populateSellerFilter(data) {
         const hasContract = contractStatus !== "" && contractStatus !== "-"
 
         const hasRevenue = parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato] || item?.["Valor contrato"] || item?.["Valor do contrato"] || 0) > 0
+        const isLeoProspect = ["não", "nao"].includes(
+            normalize(item?.[COLUMN_MAP.prospeccao])
+        )
 
-        return hasStatusMatch || hasContract || hasRevenue
+        return hasStatusMatch || hasContract || hasRevenue || isLeoProspect
     }
 
     select.innerHTML = '<option value="all">Todos</option>'

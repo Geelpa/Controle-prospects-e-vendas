@@ -1,24 +1,10 @@
 function processData(prospectData, salesData) {
     // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos
     const parseNumber = (value) => {
-        if (value === undefined || value === null || String(value).trim() === "") return 0;
-        if (typeof value === 'number') return value;
-
-        let cleanValue = value.toString().replace(/[R$\s]/g, '').trim();
-        if (cleanValue.includes(',') && cleanValue.includes('.')) {
-            cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
-        } else {
-            cleanValue = cleanValue.replace(',', '.');
-        }
-
-        if ((cleanValue.match(/\./g) || []).length > 1) {
-            const parts = cleanValue.split('.');
-            cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
-        }
-
-        const result = parseFloat(cleanValue);
-        return isNaN(result) ? 0 : result;
+        return parseFlexibleNumber(value);
     };
+
+    salesData = (salesData || []).map(applyBusinessRules);
 
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
@@ -32,6 +18,10 @@ function processData(prospectData, salesData) {
     // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
     const wonRows = getUniqueWonRows(salesData || []);
     const won = wonRows.length;
+    const conversionWonRows = wonRows.filter(item =>
+        !isAdditionalPlan(item, COLUMN_MAP) &&
+        !isOwnershipTransferChannel(item)
+    );
     const alreadyClients = getUniqueWonRows(
         (salesData || []).filter(item => isAdditionalPlan(item, COLUMN_MAP))
     ).length;
@@ -66,12 +56,13 @@ function processData(prospectData, salesData) {
         )
     }).length;
 
-    // Oportunidades trabalhadas: apenas aqueles com status 'vencemos' ou 'perdemos'
-    const conversionBase = totalProspects - noViability;
+    // Conversão: compara apenas oportunidades concluídas de aquisição (ganhas ou perdidas).
+    // Planos adicionais e trocas de titularidade não são oportunidades novas.
+    const conversionBase = conversionWonRows.length + lost;
 
     const conversion =
         conversionBase > 0
-            ? ((won / conversionBase) * 100).toFixed(1)
+            ? ((conversionWonRows.length / conversionBase) * 100).toFixed(1)
             : 0;
 
 
@@ -151,6 +142,8 @@ function processData(prospectData, salesData) {
         [COLUMN_MAP.vendedor]: getSellersName(item)
     }));
 
+    updateTopRanking(salesData || [], chartDataWithCorrectSellers);
+
     // Gráficos de desempenho devem seguir a base real de vendas e manter status perdidos/andamento
     // para comparação; só o canal de venda exclui Troca de Titularidade.
     if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
@@ -174,6 +167,398 @@ function processData(prospectData, salesData) {
     if (typeof createChannelsChart === "function") createChannelsChart(salesData || []);
     if (typeof createCampaignsChart === "function") createCampaignsChart(salesData || []);
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(salesData || []);
+}
+
+function getRankingGroupLabel(item, columnName) {
+    if (columnName === COLUMN_MAP.vendedor) {
+        const contractSeller = getContractSellerValue(item);
+        const seller = contractSeller || getSellerValue(item);
+        return resolveSellerDisplayName(seller) || seller || "Sem vendedor";
+    }
+
+    return getChartDisplayValue(item, columnName) || `Sem ${columnName.toLowerCase()}`;
+}
+
+function getRankingMonthKey(item) {
+    const date = isWon(item)
+        ? extractActivationDate(item)
+        : extractRegistrationDate(item);
+
+    return date
+        ? `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
+        : "";
+}
+
+function getRankingContractDurationMonths(item, referenceDate) {
+    const activationDate = extractActivationDate(item);
+    if (!activationDate) return 0;
+
+    const endDate = [
+        item?.[COLUMN_MAP.dataCancelamento],
+        item?.[COLUMN_MAP.dataDesistencia]
+    ].map(parseDateValue).find(Boolean) || referenceDate;
+    if (!endDate || endDate < activationDate) return 0;
+
+    return (endDate - activationDate) / (1000 * 60 * 60 * 24 * 30.4375);
+}
+
+function isRankingContractPenalty(item) {
+    const contractStatus = normalize(String(item?.[COLUMN_MAP.statusContrato] || ""));
+    return ["cancelled", "withdrawn"].includes(getContractStatusCategory(item)) ||
+        STATUS.contractCancelled.includes(contractStatus) ||
+        STATUS.contractWithdrawn.includes(contractStatus);
+}
+
+function getRankingGroupMetrics(rows, columnName, referenceDate = new Date()) {
+    const grouped = new Map();
+
+    rows.forEach(item => {
+        if (!isWon(item) && !isLossStatus(item) && !isRankingContractPenalty(item)) return;
+
+        const label = getRankingGroupLabel(item, columnName);
+        const key = normalize(label);
+        if (!key || key === "undefined") return;
+
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                label,
+                won: 0,
+                lost: 0,
+                revenue: 0,
+                received: 0,
+                durationMonths: 0,
+                durationCount: 0,
+                cancelled: 0,
+                months: new Set()
+            });
+        }
+
+        const entry = grouped.get(key);
+        const monthKey = getRankingMonthKey(item);
+        if (monthKey) entry.months.add(monthKey);
+
+        const durationMonths = getRankingContractDurationMonths(item, referenceDate);
+        if (durationMonths > 0) {
+            entry.durationMonths += durationMonths;
+            entry.durationCount++;
+        }
+
+        if (isWon(item)) {
+            entry.won++;
+            entry.revenue += parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato]);
+            entry.received += parseCurrencyNumber(item?.[COLUMN_MAP.valorRecebido]);
+        } else if (isLostStatus(item)) {
+            entry.lost++;
+        } else if (isRankingContractPenalty(item)) {
+            entry.cancelled++;
+        }
+    });
+
+    return Array.from(grouped.values());
+}
+
+function getRankingConversion(won, lost, globalConversion) {
+    const total = won + lost;
+    if (!total) return 0;
+
+    // Prior de cinco oportunidades para reduzir distorções de amostras pequenas.
+    return ((won + globalConversion * 5) / (total + 5)) * 100;
+}
+
+function getRankingScore(entry, options) {
+    const conversion = getRankingConversion(entry.won, entry.lost, options.globalConversion);
+    const volume = options.maxWon ? entry.won / options.maxWon : 0;
+    const consistency = options.totalMonths
+        ? entry.months.size / options.totalMonths
+        : 0;
+    const cancellationRate = entry.won + entry.cancelled > 0
+        ? entry.cancelled / (entry.won + entry.cancelled)
+        : 0;
+    const received = options.maxReceived ? entry.received / options.maxReceived : 0;
+
+    if (options.type === "seller") {
+        const revenue = options.maxRevenue ? entry.revenue / options.maxRevenue : 0;
+        return conversion / 100 * 0.25 + volume * 0.35 + revenue * 0.15 + received * 0.05 + consistency * 0.1 - cancellationRate * 0.1;
+    }
+
+    if (options.type === "plan") {
+        const averageReceived = entry.won ? entry.received / entry.won : 0;
+        const receivedPerActivation = options.maxAverageReceived
+            ? averageReceived / options.maxAverageReceived
+            : 0;
+        const averageDuration = entry.durationCount ? entry.durationMonths / entry.durationCount : 0;
+        const durationScore = options.maxAverageDuration
+            ? averageDuration / options.maxAverageDuration
+            : 0;
+        return conversion / 100 * 0.25 + volume * 0.1 + received * 0.25 + receivedPerActivation * 0.15 + durationScore * 0.15 + consistency * 0.1 - cancellationRate * 0.1;
+    }
+
+    const averageTicket = entry.won ? entry.revenue / entry.won : 0;
+    const ticketScore = options.maxAverageTicket
+        ? averageTicket / options.maxAverageTicket
+        : 0;
+    return conversion / 100 * 0.45 + volume * 0.2 + ticketScore * 0.15 + consistency * 0.1 - cancellationRate * 0.1;
+}
+
+function enrichRankingEntries(entries, options) {
+    return entries.map(entry => ({
+        ...entry,
+        conversion: getRankingConversion(entry.won, entry.lost, options.globalConversion),
+        score: getRankingScore(entry, options),
+        averageTicket: entry.won ? entry.revenue / entry.won : 0,
+        averageReceived: entry.won ? entry.received / entry.won : 0,
+        averageDuration: entry.durationCount ? entry.durationMonths / entry.durationCount : 0,
+        cancellationRate: entry.won + entry.cancelled > 0
+            ? (entry.cancelled / (entry.won + entry.cancelled)) * 100
+            : 0
+    }));
+}
+
+function getBestRankingEntry(entries, options) {
+    return enrichRankingEntries(entries, options)
+        .filter(entry => entry.won >= (options.minimumWon || 0))
+        .sort((first, second) =>
+            second.score - first.score ||
+            second.won - first.won ||
+            first.label.localeCompare(second.label, "pt-BR")
+        )[0] || null;
+}
+
+function formatRankingMoney(value) {
+    return value.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+        maximumFractionDigits: 0
+    });
+}
+
+function formatRankingConversion(entry, includeRevenue = false) {
+    const details = [
+        `${entry.conversion.toFixed(1).replace(".", ",")}% conversão ajustada`,
+        `${entry.won} ativações`,
+        `nota ${(entry.score * 100).toFixed(0)}`
+    ];
+
+    if (entry.cancelled > 0) {
+        details.push(`${entry.cancellationRate.toFixed(1).replace(".", ",")}% cancelamento`);
+    }
+
+    if (includeRevenue && entry.revenue > 0) {
+        details.push(formatRankingMoney(entry.revenue));
+    }
+
+    return details.join(" • ");
+}
+
+function updateTopRanking(salesRows, sellerRows) {
+    const ranking = document.getElementById("topRanking");
+    if (!ranking) return;
+
+    // Cada filtro representa uma nova fotografia do ranking: a posição volta a ser
+    // calculada pela nota geral, sem carregar a ordenação manual da base anterior.
+    activeRankingSort = {
+        category: activeRankingCategory,
+        field: "score",
+        direction: "desc"
+    };
+
+    const normalizedSalesRows = (salesRows || []).map(applyBusinessRules);
+    const uniqueRows = getDeduplicatedChartRows(normalizedSalesRows)
+        .filter(item => !isOwnershipTransferChannel(item));
+    const allRankingRows = uniqueRows.filter(item =>
+        isWon(item) || isLossStatus(item) || isRankingContractPenalty(item)
+    );
+    const rankingReferenceDate = new Date();
+    const acquisitionRows = allRankingRows.filter(item => !isAdditionalPlan(item, COLUMN_MAP));
+    const totalMonths = new Set(allRankingRows.map(getRankingMonthKey).filter(Boolean)).size;
+    const acquisitionMonths = new Set(acquisitionRows.map(getRankingMonthKey).filter(Boolean)).size;
+    const totalWon = allRankingRows.filter(isWon).length;
+    const totalLost = allRankingRows.filter(isLossStatus).length;
+    const globalConversion = totalWon + totalLost > 0
+        ? totalWon / (totalWon + totalLost)
+        : 0;
+    const acquisitionWon = acquisitionRows.filter(isWon).length;
+    const acquisitionLost = acquisitionRows.filter(isLossStatus).length;
+    const acquisitionConversion = acquisitionWon + acquisitionLost > 0
+        ? acquisitionWon / (acquisitionWon + acquisitionLost)
+        : 0;
+
+    const sellerEntries = getRankingGroupMetrics(allRankingRows, COLUMN_MAP.vendedor);
+    const sellerOptions = {
+        type: "seller",
+        globalConversion,
+        totalMonths,
+        maxWon: Math.max(...sellerEntries.map(entry => entry.won), 0),
+        maxRevenue: Math.max(...sellerEntries.map(entry => entry.revenue), 0),
+        maxReceived: Math.max(...sellerEntries.map(entry => entry.received), 0)
+    };
+    const topSeller = getBestRankingEntry(sellerEntries, sellerOptions);
+
+    const campaignEntries = getRankingGroupMetrics(acquisitionRows, COLUMN_MAP.campanha);
+    const channelEntries = getRankingGroupMetrics(acquisitionRows, COLUMN_MAP.canal);
+    const conversionOptions = entries => ({
+        type: "conversion",
+        globalConversion: acquisitionConversion,
+        totalMonths: acquisitionMonths,
+        minimumWon: 5,
+        maxWon: Math.max(...entries.map(entry => entry.won), 0),
+        maxAverageTicket: Math.max(...entries.map(entry => entry.won ? entry.revenue / entry.won : 0), 0)
+    });
+    const topCampaign = getBestRankingEntry(campaignEntries, conversionOptions(campaignEntries));
+    const topChannel = getBestRankingEntry(channelEntries, conversionOptions(channelEntries));
+    const planEntries = getRankingGroupMetrics(allRankingRows, COLUMN_MAP.plano, rankingReferenceDate);
+    const planOptions = {
+        type: "plan",
+        globalConversion,
+        totalMonths,
+        maxWon: Math.max(...planEntries.map(entry => entry.won), 0),
+        maxReceived: Math.max(...planEntries.map(entry => entry.received), 0),
+        maxAverageReceived: Math.max(...planEntries.map(entry => entry.won ? entry.received / entry.won : 0), 0),
+        maxAverageDuration: Math.max(...planEntries.map(entry => entry.durationCount ? entry.durationMonths / entry.durationCount : 0), 0)
+    };
+    const topPlan = getBestRankingEntry(planEntries, planOptions);
+
+    activeRankingViews = {
+        seller: enrichRankingEntries(sellerEntries, sellerOptions),
+        campaign: enrichRankingEntries(campaignEntries, conversionOptions(campaignEntries)),
+        channel: enrichRankingEntries(channelEntries, conversionOptions(channelEntries))
+        ,plan: enrichRankingEntries(planEntries, planOptions)
+    };
+
+    const rankingDetailModal = document.getElementById("rankingDetailModal");
+    if (rankingDetailModal && !rankingDetailModal.classList.contains("hidden")) {
+        renderRankingDetail(activeRankingCategory);
+    }
+
+    document.getElementById("topSellerName").textContent = topSeller?.label || "Sem dados";
+    document.getElementById("topSellerDetail").textContent = topSeller
+        ? `${topSeller.won} ${topSeller.won === 1 ? "venda" : "vendas"} • nota ${(topSeller.score * 100).toFixed(0)} • ${formatRankingMoney(topSeller.revenue)}${topSeller.cancelled ? ` • ${topSeller.cancellationRate.toFixed(1).replace(".", ",")}% cancelamento` : ""}`
+        : "Sem vendas no período";
+
+    document.getElementById("topCampaignName").textContent = topCampaign?.label || "Sem campanha elegível";
+    document.getElementById("topCampaignDetail").textContent = topCampaign
+        ? formatRankingConversion(topCampaign, true)
+        : "Nenhuma com 5 ativações";
+
+    document.getElementById("topChannelName").textContent = topChannel?.label || "Sem canal elegível";
+    document.getElementById("topChannelDetail").textContent = topChannel
+        ? formatRankingConversion(topChannel, true)
+        : "Nenhum com 5 ativações";
+    document.getElementById("topPlanName").textContent = topPlan?.label || "Sem plano elegível";
+    document.getElementById("topPlanDetail").textContent = topPlan
+        ? `${formatRankingMoney(topPlan.received)} recebidos • ${formatRankingMoney(topPlan.averageReceived)} por ativação • ${topPlan.averageDuration.toFixed(1).replace(".", ",")} meses • nota ${(topPlan.score * 100).toFixed(0)}`
+        : "Sem recebimentos no período";
+
+    ranking.classList.toggle("hidden", !normalizedSalesRows.length);
+}
+
+function getRankingViewConfig(category) {
+    return {
+        seller: {
+            title: "Ranking de vendedores",
+            subtitle: "Volume, conversao, receita, consistencia e qualidade"
+        },
+        campaign: {
+            title: "Ranking de campanhas",
+            subtitle: "Aquisicao nova; minimo de 5 ativacoes para destaque"
+        },
+        channel: {
+            title: "Ranking de canais",
+            subtitle: "Aquisicao nova; minimo de 5 ativacoes para destaque"
+        },
+        plan: {
+            title: "Ranking de planos",
+            subtitle: "Retorno recebido por contrato, considerando volume, consistencia e cancelamentos"
+        }
+    }[category] || {};
+}
+
+function getRankingSortValue(entry, field) {
+    if (field === "label") return normalize(entry.label);
+    return Number(entry[field] || 0);
+}
+
+function getRankingSortHeaders(category) {
+    return category === "plan"
+        ? [
+            ["label", "Plano"], ["won", "Ativacoes"],
+            ["received", "Valor recebido total"], ["averageReceived", "Recebido/ativacao"],
+            ["averageDuration", "Permanencia media"], ["cancellationRate", "Cancelamentos"], ["score", "Nota"]
+        ]
+        : [
+            ["label", "Nome"], ["won", "Ativacoes"], ["conversion", "Conversao ajustada"],
+            ["received", "Valor recebido total"], ["averageReceived", "Recebido/ativacao"],
+            ["averageTicket", "Ticket medio"], ["cancellationRate", "Cancelamentos"], ["score", "Nota"]
+        ];
+}
+
+function renderRankingSortHeader(category) {
+    const currentSort = activeRankingSort.category === category
+        ? activeRankingSort
+        : { field: "score", direction: "desc" };
+
+    return ["<th>Pos.</th>", ...getRankingSortHeaders(category).map(([field, label]) => {
+        const isActive = currentSort.field === field;
+        const arrow = isActive ? (currentSort.direction === "asc" ? "&#9650;" : "&#9660;") : "&#8597;";
+        return `<th><button type="button" class="ranking-sort-button${isActive ? " is-active" : ""}" data-ranking-sort="${field}" aria-label="Ordenar por ${label}" aria-pressed="${isActive}">${label}<span aria-hidden="true">${arrow}</span></button></th>`;
+    })].join("");
+}
+
+function renderRankingDetail(category = activeRankingCategory) {
+    const modal = document.getElementById("rankingDetailModal");
+    const title = document.getElementById("rankingDetailTitle");
+    const subtitle = document.getElementById("rankingDetailSubtitle");
+    const header = document.getElementById("rankingDetailHeader");
+    const body = document.getElementById("rankingDetailBody");
+    const config = getRankingViewConfig(category);
+    if (activeRankingSort.category !== category) {
+        activeRankingSort = { category, field: "score", direction: "desc" };
+    }
+
+    const entries = [...(activeRankingViews[category] || [])].sort((first, second) => {
+        const firstValue = getRankingSortValue(first, activeRankingSort.field);
+        const secondValue = getRankingSortValue(second, activeRankingSort.field);
+        const comparison = typeof firstValue === "string"
+            ? firstValue.localeCompare(secondValue, "pt-BR")
+            : firstValue - secondValue;
+
+        return (activeRankingSort.direction === "asc" ? comparison : -comparison) ||
+            second.score - first.score || second.won - first.won;
+    });
+
+    if (!modal || !title || !subtitle || !header || !body) return;
+
+    activeRankingCategory = category;
+    title.textContent = config.title;
+    subtitle.textContent = config.subtitle;
+    header.innerHTML = renderRankingSortHeader(category);
+    body.innerHTML = "";
+
+    if (!entries.length) {
+        body.innerHTML = "<tr><td class=\"ranking-empty\" colspan=\"8\">Nenhum participante elegivel para este periodo.</td></tr>";
+    }
+
+    entries.forEach((entry, index) => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+            <td>${index + 1}o</td>
+            <td class="font-semibold text-[#fff4e5]">${entry.label}</td>
+            <td>${entry.won}</td>
+            ${category === "plan" ? "" : `<td>${entry.conversion.toFixed(1).replace(".", ",")}%</td>`}
+            <td>${formatRankingMoney(entry.received)}</td>
+            <td>${formatRankingMoney(entry.averageReceived)}</td>
+            ${category === "plan" ? "" : `<td>${formatRankingMoney(entry.averageTicket)}</td>`}
+            ${category === "plan" ? `<td>${entry.averageDuration.toFixed(1).replace(".", ",")} meses</td>` : ""}
+            <td>${entry.cancelled} (${entry.cancellationRate.toFixed(1).replace(".", ",")}%)</td>
+            <td class="font-semibold text-[#e7b77d]">${(entry.score * 100).toFixed(0)}</td>
+        `;
+        body.appendChild(row);
+    });
+
+    document.querySelectorAll(".ranking-tab").forEach(tab => {
+        tab.classList.toggle("is-active", tab.dataset.rankingTab === category);
+    });
+    modal.classList.remove("hidden");
 }
 
 function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
@@ -444,6 +829,18 @@ function openProspectList(type) {
     openProspectListForRows(DRILLDOWN_TITLES[type] || "Prospects", rows);
 }
 
+let activeProspectModalRows = [];
+let activeProspectModalOptions = {};
+let prospectModalSortField = "";
+let prospectModalSortDirection = "asc";
+let activeRankingViews = {};
+let activeRankingCategory = "seller";
+let activeRankingSort = {
+    category: "seller",
+    field: "score",
+    direction: "desc"
+};
+
 function openProspectListForRows(modalTitle, rows, options = {}) {
     const modal = document.getElementById("prospectModal");
     const title = document.getElementById("prospectModalTitle");
@@ -453,6 +850,11 @@ function openProspectListForRows(modalTitle, rows, options = {}) {
 
     title.textContent = modalTitle || "Prospects";
     count.textContent = `${rows.length} ${rows.length === 1 ? "registro" : "registros"}`;
+
+    activeProspectModalRows = rows;
+    activeProspectModalOptions = { ...options };
+    prospectModalSortField = "";
+    prospectModalSortDirection = "asc";
 
     renderProspectTable(rows, options);
     modal.classList.remove("hidden");
@@ -483,6 +885,67 @@ function sanitizeSellerFieldsForModal(rows) {
     });
 }
 
+function getModalSortValue(row, column) {
+    const value = row?.[column];
+
+    if (value === undefined || value === null || String(value).trim() === "") return "";
+
+    if ([COLUMN_MAP.data, COLUMN_MAP.dataAtivacao, COLUMN_MAP.dataCancelamento, COLUMN_MAP.dataDesistencia].includes(column)) {
+        const date = parseDateValue(value);
+        if (date) return date.getTime();
+    }
+
+    if ([COLUMN_MAP.valorContrato, COLUMN_MAP.taxaAtivacao].includes(column)) {
+        return parseCurrencyNumber(value);
+    }
+
+    return normalize(String(value));
+}
+
+function parseDateValue(value) {
+    const text = String(value).trim();
+    const brazilianDate = text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})/);
+
+    if (brazilianDate) {
+        const day = Number(brazilianDate[1]);
+        const month = Number(brazilianDate[2]);
+        const year = Number(brazilianDate[3].length === 2 ? `20${brazilianDate[3]}` : brazilianDate[3]);
+        if (day < 1 || month < 1 || year < 1) return null;
+
+        const parsedDate = new Date(year, month - 1, day);
+        return parsedDate.getFullYear() === year &&
+            parsedDate.getMonth() === month - 1 &&
+            parsedDate.getDate() === day
+            ? parsedDate
+            : null;
+    }
+
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function sortProspectRows(rows, field, direction) {
+    if (!field) return rows;
+
+    const factor = direction === "desc" ? -1 : 1;
+    return rows
+        .map((row, index) => ({ row, index, value: getModalSortValue(row, field) }))
+        .sort((first, second) => {
+            if (first.value === second.value) return first.index - second.index;
+            if (first.value === "") return 1;
+            if (second.value === "") return -1;
+            return (first.value > second.value ? 1 : -1) * factor;
+        })
+        .map(entry => entry.row);
+}
+
+function isActivationDateContext(rows) {
+    return rows.length > 0 && rows.every(row =>
+        (typeof isWon === "function" && isWon(row)) ||
+        normalize(String(row?.[COLUMN_MAP.status] || "")) === "vencemos"
+    );
+}
+
 function renderProspectTable(rows, options = {}) {
     const header = document.getElementById("prospectListHeader");
     const body = document.getElementById("prospectListBody");
@@ -491,7 +954,7 @@ function renderProspectTable(rows, options = {}) {
 
     if (!header || !body || !empty) return;
 
-    const displayRows = sanitizeSellerFieldsForModal(rows);
+    const displayRows = sanitizeSellerFieldsForModal(sortProspectRows(rows, prospectModalSortField, prospectModalSortDirection));
 
     header.innerHTML = "";
     body.innerHTML = "";
@@ -513,6 +976,17 @@ function renderProspectTable(rows, options = {}) {
         hiddenColumns.push("Motivo de Perda");
     }
 
+    const hasFilledMotivo = displayRows.some(row => {
+        const value = String(row?.[COLUMN_MAP.motivoPerda] ?? "").trim();
+        return value !== "" && value !== "-" && value !== "--";
+    });
+
+    if (!hasFilledMotivo) {
+        hiddenColumns.push(COLUMN_MAP.motivoPerda);
+        hiddenColumns.push("Motivo");
+        hiddenColumns.push("Motivo de Perda");
+    }
+
     if (currentTitle.includes("perd")) {
         hiddenColumns.push(COLUMN_MAP.plano);
         hiddenColumns.push("Plano");
@@ -525,6 +999,12 @@ function renderProspectTable(rows, options = {}) {
         hiddenColumns.push(COLUMN_MAP.contrato);
         hiddenColumns.push("Contrato Gerado");
         hiddenColumns.push("Contrato");
+    }
+
+    if (currentTitle.includes("venc")) {
+        hiddenColumns.push(COLUMN_MAP.data);
+        hiddenColumns.push("Data do cadastro");
+        hiddenColumns.push("Data cadastro");
     }
 
     if (currentTitle.includes("prospect") || currentTitle.includes("andamento") || currentTitle.includes("viabil") || currentTitle.includes("perd")) {
@@ -554,6 +1034,23 @@ function renderProspectTable(rows, options = {}) {
         );
     });
 
+    const dateColumns = [COLUMN_MAP.data, COLUMN_MAP.dataAtivacao];
+    const dateColumnIndex = columns.findIndex(column => dateColumns.includes(column));
+    const hasMainDate = displayRows.some(row => getModalDateValue(row));
+
+    dateColumns.forEach(column => {
+        const index = columns.indexOf(column);
+        if (index >= 0) columns.splice(index, 1);
+    });
+
+    if (hasMainDate) {
+        const mainDateColumn = currentTitle.includes("venc")
+            ? COLUMN_MAP.dataAtivacao
+            : COLUMN_MAP.data;
+        const mainDateIndex = columns.indexOf(mainDateColumn);
+        columns.splice(mainDateIndex >= 0 ? mainDateIndex : columns.length, 0, mainDateColumn);
+    }
+
     const conditionalColumns = [
         COLUMN_MAP.dataCancelamento,
         COLUMN_MAP.dataDesistencia
@@ -570,8 +1067,39 @@ function renderProspectTable(rows, options = {}) {
 
     columns.forEach(column => {
         const cell = document.createElement("th");
-        cell.className = "p-4 text-left text-white whitespace-normal";
-        cell.textContent = getColumnLabel(column);
+        cell.className = "p-3 text-left text-white whitespace-normal align-top";
+
+        const label = document.createElement("div");
+        label.className = "mb-1";
+        label.textContent = column === COLUMN_MAP.data && isActivationDateContext(displayRows)
+            ? "Data de ativação"
+            : getColumnLabel(column);
+
+        const sortControls = document.createElement("div");
+        sortControls.className = "flex items-center gap-1";
+
+        [
+            { direction: "asc", icon: "↑", label: "Ordenar crescente" },
+            { direction: "desc", icon: "↓", label: "Ordenar decrescente" }
+        ].forEach(({ direction, icon, label: buttonLabel }) => {
+            const sortButton = document.createElement("button");
+            sortButton.type = "button";
+            sortButton.className = "prospect-sort-button";
+            sortButton.dataset.sortColumn = column;
+            sortButton.dataset.sortDirection = direction;
+            sortButton.title = buttonLabel;
+            sortButton.setAttribute("aria-label", `${buttonLabel}: ${getColumnLabel(column)}`);
+            sortButton.textContent = icon;
+
+            if (prospectModalSortField === column && prospectModalSortDirection === direction) {
+                sortButton.classList.add("is-active");
+            }
+
+            sortControls.appendChild(sortButton);
+        });
+
+        cell.appendChild(label);
+        cell.appendChild(sortControls);
         header.appendChild(cell);
     });
 
@@ -581,8 +1109,8 @@ function renderProspectTable(rows, options = {}) {
 
         columns.forEach(column => {
             const cell = document.createElement("td");
-            cell.className = "p-2 text-white border border-yellow-500";
-            cell.textContent = formatListValue(column, row[column]);
+            cell.className = "p-3 text-white";
+            cell.textContent = formatListValue(column, row[column], row);
             line.appendChild(cell);
         });
 
@@ -717,7 +1245,11 @@ function getColumnLabel(column) {
     return column;
 }
 
-function formatListValue(column, value) {
+function formatListValue(column, value, row) {
+    if (column === COLUMN_MAP.data) {
+        return getModalDateValue(row) || "-";
+    }
+
     if (column === COLUMN_MAP.vendedor) return resolveSellerDisplayName(value) || value || "-";
     return value || "-";
 }
@@ -743,6 +1275,71 @@ document.getElementById("prospectModal").addEventListener("click", event => {
     if (event.target.id === "prospectModal") closeProspectList();
 });
 
+document.getElementById("prospectListHeader").addEventListener("click", event => {
+    const sortButton = event.target.closest("button[data-sort-column]");
+    if (!sortButton) return;
+
+    const isSameSort = prospectModalSortField === sortButton.dataset.sortColumn &&
+        prospectModalSortDirection === sortButton.dataset.sortDirection;
+
+    if (isSameSort) {
+        prospectModalSortField = "";
+    } else {
+        prospectModalSortField = sortButton.dataset.sortColumn;
+        prospectModalSortDirection = sortButton.dataset.sortDirection;
+    }
+
+    renderProspectTable(activeProspectModalRows, activeProspectModalOptions);
+});
+
+document.getElementById("topRanking").addEventListener("click", event => {
+    const card = event.target.closest("[data-ranking-category]");
+    if (card) renderRankingDetail(card.dataset.rankingCategory);
+});
+
+document.getElementById("topRanking").addEventListener("keydown", event => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    const card = event.target.closest("[data-ranking-category]");
+    if (!card) return;
+
+    event.preventDefault();
+    renderRankingDetail(card.dataset.rankingCategory);
+});
+
+document.getElementById("rankingDetailHeader").addEventListener("click", event => {
+    const sortButton = event.target.closest("button[data-ranking-sort]");
+    if (!sortButton) return;
+
+    const field = sortButton.dataset.rankingSort;
+    const isSameSort = activeRankingSort.category === activeRankingCategory &&
+        activeRankingSort.field === field;
+
+    activeRankingSort = {
+        category: activeRankingCategory,
+        field,
+        direction: isSameSort && activeRankingSort.direction === "asc" ? "desc" : "asc"
+    };
+    renderRankingDetail(activeRankingCategory);
+});
+
+document.querySelectorAll(".ranking-tab").forEach(tab => {
+    tab.addEventListener("click", () => renderRankingDetail(tab.dataset.rankingTab));
+});
+
+document.getElementById("closeRankingDetailModal").addEventListener("click", () => {
+    document.getElementById("rankingDetailModal").classList.add("hidden");
+});
+
+document.getElementById("rankingDetailModal").addEventListener("click", event => {
+    if (event.target.id === "rankingDetailModal") {
+        event.currentTarget.classList.add("hidden");
+    }
+});
+
 document.addEventListener("keydown", event => {
-    if (event.key === "Escape") closeProspectList();
+    if (event.key !== "Escape") return;
+
+    closeProspectList();
+    document.getElementById("rankingDetailModal").classList.add("hidden");
 });

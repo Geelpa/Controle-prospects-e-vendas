@@ -4,24 +4,7 @@
 
 // 1. Trata e converte valores numéricos vindos da planilha
 const parseNumber = (value) => {
-    if (value === undefined || value === null || String(value).trim() === "") return 0;
-    if (typeof value === 'number') return value;
-
-    let cleanValue = value.toString().replace(/[R$\s]/g, '').trim();
-
-    if (cleanValue.includes(',') && cleanValue.includes('.')) {
-        cleanValue = cleanValue.replace(/\./g, '').replace(',', '.');
-    } else {
-        cleanValue = cleanValue.replace(',', '.');
-    }
-
-    if ((cleanValue.match(/\./g) || []).length > 1) {
-        const parts = cleanValue.split('.');
-        cleanValue = parts[0] + '.' + parts[1].substring(0, 2);
-    }
-
-    const result = parseFloat(cleanValue);
-    return isNaN(result) ? 0 : result;
+    return parseFlexibleNumber(value)
 };
 
 // 2. Identifica se é um plano adicional ou um prospect novo

@@ -59,19 +59,43 @@
 
         /* Modal-specific styles to match the brown theme */
         #prospectModal {
-            backdrop-filter: blur(4px);
+            backdrop-filter: blur(8px);
+            background: rgba(15, 10, 8, 0.78);
+            align-items: center;
+            justify-content: center;
         }
 
         #prospectModal > div {
-            background-color: #443027 !important;
-            border: 1px solid #6b4f3f !important;
+            background: #35251e !important;
+            border: 1px solid #876247 !important;
             color: #f3e2cc !important;
+            width: min(96vw, 1600px);
+            max-height: min(88vh, 860px);
+            overflow: hidden;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(226, 164, 99, 0.08);
         }
 
         /* Header area inside modal */
         #prospectModal .border-b {
             border-color: #6b4f3f !important;
-            background: linear-gradient(180deg, rgba(107,79,63,0.06), transparent);
+            background: linear-gradient(135deg, rgba(135, 98, 71, 0.24), rgba(68, 48, 39, 0.12));
+        }
+
+        #prospectModalTitle {
+            color: #fff4e5 !important;
+            letter-spacing: -0.01em;
+        }
+
+        #prospectModalCount {
+            display: inline-flex;
+            margin-top: 0.4rem;
+            padding: 0.2rem 0.55rem;
+            border: 1px solid rgba(214, 155, 95, 0.45);
+            border-radius: 999px;
+            background: rgba(198, 134, 66, 0.12);
+            color: #e7b77d !important;
+            font-size: 0.72rem;
+            font-weight: 600;
         }
 
         #prospectModal .text-sm,
@@ -83,15 +107,97 @@
         /* Table inside modal */
         #prospectModal table {
             color: #e5c9ac;
+            border-collapse: separate;
+            border-spacing: 0;
         }
 
         #prospectModal thead tr {
-            background-color: #5a3e2d !important;
+            background-color: #50372a !important;
             color: #f3e2cc !important;
         }
 
+        #prospectModal thead th {
+            min-width: 150px;
+            border-right: 1px solid rgba(184, 135, 93, 0.22);
+            border-bottom: 1px solid #876247;
+            background: #50372a;
+        }
+
+        #prospectModal thead th:first-child,
+        #prospectModal tbody td:first-child {
+            width: 92px;
+            min-width: 92px;
+            max-width: 92px;
+        }
+
+        #prospectModal thead th:last-child {
+            border-right: 0;
+        }
+
+        #prospectModal .prospect-sort-button {
+            width: 26px;
+            height: 26px;
+            padding: 0 !important;
+            border: 1px solid rgba(214, 155, 95, 0.32) !important;
+            border-radius: 0.35rem !important;
+            background: #3e2b22 !important;
+            color: #c9a17d !important;
+            font-size: 1rem;
+            line-height: 1;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+
+        #prospectModal .prospect-sort-button:hover,
+        #prospectModal .prospect-sort-button:focus-visible {
+            border-color: #d69b5f !important;
+            background: #493126 !important;
+            color: #fff4e5 !important;
+        }
+
+        #prospectModal .prospect-sort-button.is-active {
+            border-color: #e2a463 !important;
+            background: #a9673a !important;
+            color: #fff8ed !important;
+            box-shadow: 0 0 0 2px rgba(226, 164, 99, 0.14);
+        }
+
         #prospectModal tbody tr {
-            border-bottom: 1px solid #6b4f3f;
+            border-bottom: 1px solid rgba(135, 98, 71, 0.32);
+            transition: background-color 140ms ease;
+        }
+
+        #prospectModal tbody tr:nth-child(even) {
+            background: rgba(255, 244, 229, 0.025);
+        }
+
+        #prospectModal tbody tr:hover {
+            background: rgba(214, 155, 95, 0.13) !important;
+        }
+
+        #prospectModal tbody td {
+            border-right: 1px solid rgba(135, 98, 71, 0.18) !important;
+            border-bottom: 1px solid rgba(135, 98, 71, 0.28) !important;
+            color: #f1ddc6 !important;
+            vertical-align: top;
+        }
+
+        #prospectModal tbody td:last-child {
+            border-right: 0 !important;
+        }
+
+        #shortcutModal {
+            backdrop-filter: blur(8px);
+            background: rgba(15, 10, 8, 0.78);
+            align-items: center;
+            justify-content: center;
+        }
+
+        #shortcutModal > div {
+            background: #35251e !important;
+            border: 1px solid #876247 !important;
+            color: #f3e2cc !important;
+            width: min(96vw, 560px);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(226, 164, 99, 0.08);
         }
 
         /* Scrollbar inside modal (WebKit) */
@@ -108,11 +214,338 @@
             border-radius: 8px;
         }
 
+        #prospectModal .overflow-auto {
+            scrollbar-color: #876247 #2b1e18;
+            scrollbar-width: thin;
+        }
+
+        #topRanking {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 0.65rem;
+            margin-bottom: 1rem;
+        }
+
+        #topRanking.hidden {
+            display: none;
+        }
+
+        .top-ranking-card {
+            cursor: pointer;
+            transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+        }
+
+        .top-ranking-card:hover,
+        .top-ranking-card:focus-visible {
+            transform: translateY(-2px);
+            border-color: #d69b5f;
+            background: linear-gradient(135deg, rgba(112, 73, 49, 0.98), rgba(75, 48, 36, 0.98));
+            outline: none;
+        }
+
+        #rankingDetailModal {
+            backdrop-filter: blur(8px);
+            background: rgba(15, 10, 8, 0.86);
+            align-items: center;
+            justify-content: center;
+        }
+
+        #rankingDetailModal:not(.hidden) {
+            display: flex;
+        }
+
+        #rankingDetailModal > div {
+            background: #35251e !important;
+            border: 1px solid #876247 !important;
+            color: #f3e2cc !important;
+            width: min(96vw, 1600px);
+            max-height: min(88vh, 860px);
+            overflow: hidden;
+            border-radius: 0.5rem;
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(226, 164, 99, 0.08);
+        }
+
+        #rankingDetailModal .ranking-detail-header {
+            min-height: 0;
+            padding: 1rem 1.25rem;
+            background: linear-gradient(135deg, rgba(135, 98, 71, 0.24), rgba(68, 48, 39, 0.12));
+            border-bottom-color: #6b4f3f !important;
+        }
+
+        #rankingDetailModal .ranking-detail-eyebrow {
+            color: #e2a463;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        #rankingDetailModal #rankingDetailTitle {
+            margin-top: 0.2rem;
+            color: #fff4e5;
+            font-size: 1.25rem;
+            letter-spacing: -0.01em;
+        }
+
+        #rankingDetailModal #rankingDetailSubtitle {
+            color: #d6ad87;
+        }
+
+        #rankingDetailModal #closeRankingDetailModal {
+            min-width: 76px;
+            border-color: rgba(214, 155, 95, 0.5) !important;
+            background: rgba(35, 23, 17, 0.42) !important;
+            color: #f3e2cc !important;
+            font-size: 0.75rem;
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
+        }
+
+        #rankingDetailModal #closeRankingDetailModal:hover {
+            border-color: #d69b5f !important;
+            background: #6b4f3f !important;
+        }
+
+        #rankingDetailModal .ranking-tabs {
+            padding: 0.75rem 1.25rem;
+            gap: 0.5rem;
+            background: rgba(35, 24, 18, 0.28);
+            border-bottom-color: #6b4f3f !important;
+        }
+
+        #rankingDetailModal .ranking-tab {
+            min-width: 92px;
+            border: 1px solid transparent !important;
+            border-radius: 0.45rem !important;
+            background: transparent !important;
+            color: #d6ad87 !important;
+            font-size: 0.72rem;
+            letter-spacing: 0.02em;
+            transition: background-color 140ms ease, border-color 140ms ease, color 140ms ease;
+        }
+
+        #rankingDetailModal .ranking-tab:hover,
+        #rankingDetailModal .ranking-tab:focus-visible {
+            border-color: rgba(214, 155, 95, 0.45) !important;
+            background: rgba(135, 98, 71, 0.24) !important;
+            color: #fff4e5 !important;
+            outline: none;
+        }
+
+        #rankingDetailTableWrap {
+            max-height: 58vh;
+            overflow: auto;
+            padding: 0.75rem 1.25rem 1.25rem;
+            background: #35251e;
+            scrollbar-color: #876247 #2b1e18;
+            scrollbar-width: thin;
+        }
+
+        #rankingDetailTable {
+            border-collapse: separate;
+            border-spacing: 0;
+            min-width: 850px;
+        }
+
+        #rankingDetailTable th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: #50372a;
+            color: #fff4e5;
+            font-size: 0.62rem;
+            font-weight: 700;
+            letter-spacing: 0.09em;
+            text-align: left;
+            text-transform: uppercase;
+            white-space: nowrap;
+            box-shadow: 0 2px 0 rgba(226, 164, 99, 0.22);
+        }
+
+        #rankingDetailTable .ranking-sort-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            width: 100%;
+            padding: 0 !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            background: transparent !important;
+            color: #fff4e5 !important;
+            font: inherit;
+            letter-spacing: inherit;
+            text-align: inherit;
+            text-transform: inherit;
+        }
+
+        #rankingDetailTable .ranking-sort-button span {
+            color: #d69b5f;
+            font-size: 0.72rem;
+            opacity: 0.6;
+        }
+
+        #rankingDetailTable .ranking-sort-button.is-active span,
+        #rankingDetailTable .ranking-sort-button:hover span,
+        #rankingDetailTable .ranking-sort-button:focus-visible span {
+            opacity: 1;
+        }
+
+        #rankingDetailTable .ranking-sort-button:focus-visible {
+            outline: 2px solid #e2a463;
+            outline-offset: 3px;
+        }
+
+        #rankingDetailTable td,
+        #rankingDetailTable th {
+            padding: 0.75rem 0.8rem;
+            border-bottom: 1px solid rgba(135, 98, 71, 0.35);
+        }
+
+        #rankingDetailTable td:nth-child(n+3),
+        #rankingDetailTable th:nth-child(n+3) {
+            text-align: right;
+        }
+
+        #rankingDetailTable tbody td {
+            color: #ead4bd;
+            background: transparent;
+            border-top: 0;
+            border-bottom: 1px solid rgba(135, 98, 71, 0.35);
+        }
+
+        #rankingDetailTable tbody tr:nth-child(even) {
+            background: rgba(255, 244, 229, 0.025);
+        }
+
+        #rankingDetailTable tbody tr:hover {
+            background: rgba(214, 155, 95, 0.13);
+        }
+
+        #rankingDetailTable tbody tr:first-child {
+            background: linear-gradient(90deg, rgba(198, 134, 66, 0.18), rgba(198, 134, 66, 0.04));
+        }
+
+        #rankingDetailTable tbody tr:first-child td:first-child {
+            color: #f0b96f;
+            font-weight: 800;
+        }
+
+        #rankingDetailTable .ranking-empty {
+            padding: 2.5rem 1rem;
+            color: #d6ad87;
+            text-align: center;
+            background: transparent !important;
+        }
+
+        @media (max-width: 640px) {
+            #rankingDetailModal {
+                padding: 0.65rem;
+            }
+
+            #rankingDetailModal > div {
+                width: 100%;
+                max-height: 92vh;
+            }
+
+            #rankingDetailTableWrap {
+                padding: 0.75rem;
+            }
+
+            #rankingDetailModal .ranking-detail-header {
+                min-height: 96px;
+                padding: 1rem;
+            }
+
+            #rankingDetailModal .ranking-tabs,
+            #rankingDetailTableWrap {
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            #rankingDetailModal #closeRankingDetailModal {
+                padding: 0.45rem 0.65rem !important;
+                font-size: 0.75rem;
+            }
+        }
+
+        .ranking-tab.is-active {
+            background: #a9673a !important;
+            border-color: #e2a463 !important;
+            color: #fff8ed !important;
+        }
+
+        .top-ranking-card {
+            min-width: 0;
+            padding: 0.8rem 1rem;
+            border: 1px solid rgba(135, 98, 71, 0.7);
+            border-radius: 0.65rem;
+            background: linear-gradient(135deg, rgba(92, 61, 44, 0.92), rgba(65, 43, 33, 0.96));
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+        }
+
+        .top-ranking-card__label {
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            color: #d6ad87;
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .top-ranking-card__value {
+            overflow: hidden;
+            margin-top: 0.35rem;
+            color: #fff4e5;
+            font-size: 1rem;
+            font-weight: 700;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .top-ranking-card__detail {
+            margin-top: 0.18rem;
+            color: #c9a98d;
+            font-size: 0.72rem;
+        }
+
+        @media (max-width: 760px) {
+            #topRanking {
+                grid-template-columns: 1fr;
+            }
+        }
+
         /* Modal action buttons */
         #prospectModal button {
-            background: #6b4f3f !important;
+            background: rgba(135, 98, 71, 0.38) !important;
             color: #f3e2cc !important;
-            border: 1px solid #6b4f3f !important;
+            border: 1px solid rgba(214, 155, 95, 0.5) !important;
+            transition: background-color 140ms ease, border-color 140ms ease;
+        }
+
+        #prospectModal button:hover {
+            background: #6b4f3f !important;
+            border-color: #d69b5f !important;
+        }
+
+        @media (max-width: 640px) {
+            #prospectModal {
+                padding: 0.65rem;
+            }
+
+            #prospectModal > div {
+                width: 100%;
+                max-height: 92vh;
+            }
+
+            #prospectModal > div > div:first-child {
+                padding: 0.9rem 1rem;
+            }
+
+            #prospectModal .overflow-auto {
+                margin-left: 0;
+            }
         }
 
     </style>
@@ -138,12 +571,76 @@
             </div>
 
             <!-- Upload -->
-            <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg px-4 py-3 shadow-sm">
+            <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg px-4 py-3 shadow-sm flex flex-wrap items-center justify-end gap-2">
 
                 <input type="file" id="csvFile" accept=".csv" multiple class="text-sm text-[#f3e2cc]" />
 
+                <select id="savedShortcutSelect" aria-label="Selecionar atalho de dados" class="text-sm">
+                    <option value="">Atalhos salvos</option>
+                </select>
+
+                <button id="editShortcutButton" type="button" class="text-sm font-semibold" disabled>
+                    Editar
+                </button>
+
+                <button id="deleteShortcutButton" type="button" class="text-sm font-semibold" disabled>
+                    Excluir
+                </button>
+
+                <button id="createShortcutButton" type="button" class="text-sm font-semibold">
+                    Criar atalho
+                </button>
+
             </div>
 
+        </div>
+
+        <div id="topRanking" class="hidden" aria-label="Ranking de desempenho">
+            <article class="top-ranking-card" data-ranking-category="seller" role="button" tabindex="0" aria-label="Ver ranking de vendedores">
+                <div class="top-ranking-card__label"><span aria-hidden="true">★</span> Mais vendas</div>
+                <div id="topSellerName" class="top-ranking-card__value">-</div>
+                <div id="topSellerDetail" class="top-ranking-card__detail">Sem dados</div>
+            </article>
+            <article class="top-ranking-card" data-ranking-category="campaign" role="button" tabindex="0" aria-label="Ver ranking de campanhas">
+                <div class="top-ranking-card__label"><span aria-hidden="true">↗</span> Melhor campanha</div>
+                <div id="topCampaignName" class="top-ranking-card__value">-</div>
+                <div id="topCampaignDetail" class="top-ranking-card__detail">Mínimo de 5 ativações</div>
+            </article>
+            <article class="top-ranking-card" data-ranking-category="channel" role="button" tabindex="0" aria-label="Ver ranking de canais">
+                <div class="top-ranking-card__label"><span aria-hidden="true">◆</span> Melhor canal</div>
+                <div id="topChannelName" class="top-ranking-card__value">-</div>
+                <div id="topChannelDetail" class="top-ranking-card__detail">Mínimo de 5 ativações</div>
+            </article>
+            <article class="top-ranking-card" data-ranking-category="plan" role="button" tabindex="0" aria-label="Ver ranking de planos">
+                <div class="top-ranking-card__label"><span aria-hidden="true">$</span> Melhor retorno</div>
+                <div id="topPlanName" class="top-ranking-card__value">-</div>
+                <div id="topPlanDetail" class="top-ranking-card__detail">Sem recebimentos no período</div>
+            </article>
+        </div>
+
+        <div id="rankingDetailModal" class="hidden fixed inset-0 z-50 p-4">
+            <div class="rounded-xl flex flex-col">
+                <div class="ranking-detail-header flex items-center justify-between gap-4 border-b border-[#6b4f3f] px-5 py-4">
+                    <div>
+                        <div class="ranking-detail-eyebrow">Desempenho comercial</div>
+                        <h2 id="rankingDetailTitle" class="text-lg font-semibold text-[#fff4e5]">Ranking detalhado</h2>
+                        <p id="rankingDetailSubtitle" class="mt-1 text-xs text-[#d6ad87]">Desempenho no período filtrado</p>
+                    </div>
+                    <button id="closeRankingDetailModal" type="button" class="px-3 py-2 text-sm font-semibold">Fechar</button>
+                </div>
+                <div class="ranking-tabs flex flex-wrap gap-2 border-b border-[#6b4f3f] px-5 py-3">
+                    <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="seller">Vendedores</button>
+                    <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="campaign">Campanhas</button>
+                    <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="channel">Canais</button>
+                    <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="plan">Planos</button>
+                </div>
+                <div id="rankingDetailTableWrap" class="px-5 pb-5">
+                    <table id="rankingDetailTable" class="min-w-full text-sm">
+                        <thead><tr id="rankingDetailHeader"></tr></thead>
+                        <tbody id="rankingDetailBody"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <!-- INSTRUÇÕES -->
@@ -494,9 +991,41 @@
 
     </div>
 
+    <div id="shortcutModal" class="hidden fixed inset-0 z-50 p-4">
+        <div class="rounded-xl shadow-xl m-auto flex flex-col">
+            <div class="flex items-center justify-between gap-4 border-b border-[#6b4f3f] px-5 py-4">
+                <div>
+                    <h2 id="shortcutModalTitle" class="text-lg font-semibold text-[#fff4e5]">Criar atalho</h2>
+                    <p id="shortcutModalDescription" class="mt-1 text-xs text-[#d6ad87]">Salve um conjunto de arquivos para consultar depois.</p>
+                </div>
+                <button id="closeShortcutModal" type="button" class="text-sm font-semibold">Fechar</button>
+            </div>
+
+            <form id="shortcutForm" class="flex flex-col gap-4 p-5">
+                <label class="flex flex-col gap-2 text-sm font-semibold">
+                    Nome do atalho
+                    <input id="shortcutName" type="text" maxlength="80" required placeholder="Ex.: Base setembro" />
+                </label>
+
+                <label class="flex flex-col gap-2 text-sm font-semibold">
+                    Arquivos CSV
+                    <input id="shortcutFiles" type="file" accept=".csv" multiple />
+                    <span id="shortcutFilesHint" class="text-xs font-normal text-[#d6ad87]">Selecione um ou mais arquivos.</span>
+                </label>
+
+                <p id="shortcutFormMessage" class="hidden text-sm" role="status"></p>
+
+                <div class="flex justify-end gap-2">
+                    <button id="cancelShortcutButton" type="button" class="text-sm font-semibold">Cancelar</button>
+                    <button id="saveShortcutButton" type="submit" class="text-sm font-semibold">Salvar atalho</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div id="prospectModal" class="hidden fixed inset-0 z-50 bg-[#00000080] p-4">
         <div
-            class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg shadow-xl max-w-8xl m-auto max-h-[90vh] flex flex-col">
+            class="bg-[#4b3528] border border-[#6b4f3f] rounded-xl shadow-xl m-auto flex flex-col">
             <div class="flex items-center justify-between gap-4 border-b border-[#6b4f3f] px-5 py-4">
                 <div>
                     <h2 id="prospectModalTitle" class="text-lg font-semibold text-slate-500">
@@ -517,7 +1046,7 @@
                 Nenhum registro encontrado para este filtro.
             </div>
 
-            <div class="overflow-auto ml-3">
+            <div class="overflow-auto ml-0 px-3 pb-3">
                 <table class="min-w-full text-sm">
                     <thead
                         class="bg-[#5a3e2d] text-xs font-semibold uppercase tracking-wide text-[#f3e2cc] sticky top-0">

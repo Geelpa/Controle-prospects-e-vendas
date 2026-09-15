@@ -1,8 +1,49 @@
 let uploadedCsvFiles = []
+const SHORTCUT_STORAGE_KEY = "dashboardComercial.shortcuts"
+let editingShortcutId = ""
 
 document
     .getElementById("csvFile")
     .addEventListener("change", handleFile)
+
+document
+    .getElementById("savedShortcutSelect")
+    .addEventListener("change", event => {
+        updateShortcutActions(event.target.value)
+        loadShortcut(event.target.value)
+    })
+
+document
+    .getElementById("editShortcutButton")
+    .addEventListener("click", () => openShortcutModal("edit"))
+
+document
+    .getElementById("deleteShortcutButton")
+    .addEventListener("click", deleteSelectedShortcut)
+
+document
+    .getElementById("createShortcutButton")
+    .addEventListener("click", openShortcutModal)
+
+document
+    .getElementById("closeShortcutModal")
+    .addEventListener("click", closeShortcutModal)
+
+document
+    .getElementById("cancelShortcutButton")
+    .addEventListener("click", closeShortcutModal)
+
+document
+    .getElementById("shortcutForm")
+    .addEventListener("submit", saveShortcut)
+
+document
+    .getElementById("shortcutModal")
+    .addEventListener("click", event => {
+        if (event.target.id === "shortcutModal") closeShortcutModal()
+    })
+
+refreshShortcutSelect()
 
 function normalizeCsvText(value) {
     return String(value ?? "")
@@ -11,15 +52,7 @@ function normalizeCsvText(value) {
 }
 
 function parseCurrencyLike(value) {
-    if (value === undefined || value === null || normalizeCsvText(value) === "") return 0
-
-    const clean = normalizeCsvText(value)
-        .replace(/[R$\s]/g, "")
-        .replace(/\./g, "")
-        .replace(",", ".")
-
-    const parsed = Number.parseFloat(clean)
-    return Number.isFinite(parsed) ? parsed : 0
+    return parseFlexibleNumber(value)
 }
 
 function rowCompletenessScore(row) {
@@ -120,6 +153,7 @@ function mergeRowData(existingRow, incomingRow) {
 
 function getRowIdentity(row) {
     const identityCandidates = [
+        row?.[COLUMN_MAP.idContrato],
         row?.ID,
         row?.["ID Prospect"],
         row?.["ID do prospect"],
@@ -145,6 +179,57 @@ function getRowIdentity(row) {
     if (priority) return `id:${priority}`
 
     return `razao:${normalized[0]}`
+}
+
+function normalizeContractKey(value) {
+    const text = normalizeCsvText(value).toLowerCase()
+    if (!text) return ""
+
+    return text.replace(/\s+/g, "").replace(/\.0+$/, "")
+}
+
+function getContractKeys(row) {
+    return Array.from(new Set([
+        row?.[COLUMN_MAP.idContrato],
+        row?.[COLUMN_MAP.contrato],
+        row?.Contrato,
+        row?.ID
+    ].map(normalizeContractKey).filter(Boolean)))
+}
+
+function isReceivedPaymentRow(row) {
+    return Boolean(
+        normalizeCsvText(row?.[COLUMN_MAP.idContrato]) &&
+        normalizeCsvText(row?.[COLUMN_MAP.valorRecebido])
+    )
+}
+
+function buildReceivedByContract(rows) {
+    const receivedByContract = new Map()
+
+    rows.filter(isReceivedPaymentRow).forEach(row => {
+        const amount = parseCurrencyLike(row[COLUMN_MAP.valorRecebido])
+        if (!amount) return
+
+        getContractKeys(row).forEach(key => {
+            receivedByContract.set(key, (receivedByContract.get(key) || 0) + amount)
+        })
+    })
+
+    return receivedByContract
+}
+
+function attachReceivedValues(rows, receivedByContract) {
+    return rows.map(row => {
+        const received = getContractKeys(row)
+            .map(key => receivedByContract.get(key) || 0)
+            .find(value => value > 0) || 0
+
+        return {
+            ...row,
+            [COLUMN_MAP.valorRecebido]: received
+        }
+    })
 }
 
 function choosePreferredRow(existingRow, incomingRow) {
@@ -263,14 +348,19 @@ function normalizeRowHeaders(row = {}) {
         [COLUMN_MAP.canal, ["Canal de venda", "Canal", "Canal de venda "]],
         [COLUMN_MAP.campanha, ["Campanha de venda", "Campanha", "Campanha de venda "]],
         [COLUMN_MAP.campanhaInstalacao, ["Campanha de instalação", "Campanha de instalacao"]],
-        [COLUMN_MAP.vendedor, ["Vendedor", "Vendedor Prospect", "Vendedor prospect", "Vendedor do prospect", "Vendedor Comercia", "Vendedor comercial", "Vendedor Contrato", "Vendedor do contrato", "Consultor"]],
+        [COLUMN_MAP.vendedorProspect, ["Vendedor Prospect", "Vendedor prospect", "Vendedor do prospect"]],
+        [COLUMN_MAP.vendedorContrato, ["Vendedor Contrato", "Vendedor do contrato", "Vendedor contrato"]],
+        [COLUMN_MAP.vendedor, ["Vendedor", "Vendedor Comercia", "Vendedor comercial", "Consultor"]],
+        [COLUMN_MAP.prospeccao, ["Prospecção", "Prospeccao", "Prospecção?", "É prospecção", "E prospeccao"]],
         [COLUMN_MAP.status, ["Status", "status"]],
         [COLUMN_MAP.motivoPerda, ["Motivo perdemos", "Motivo", "Motivo de perda", "Descrição", "Descricao"]],
         [COLUMN_MAP.plano, ["Plano de venda", "Plano", "Plano do plano", "Plano de contrato"]],
         [COLUMN_MAP.data, ["Data do cadastro", "Data cadastro", "Data do Cadastro", "Data de cadastro"]],
         [COLUMN_MAP.dataAtivacao, ["Data ativação", "Data de ativação", "Data ativacao", "Data de ativacao", "Data Ativação", "Data Ativacao"]],
         [COLUMN_MAP.contrato, ["Contrato Gerado", "Contrato", "Contrato gerado"]],
+        [COLUMN_MAP.idContrato, ["ID contrato", "ID Contrato", "Id contrato", "Contrato ID"]],
         [COLUMN_MAP.valorContrato, ["Valor contrato", "Valor do plano", "Valor do contrato", "Valor"]],
+        [COLUMN_MAP.valorRecebido, ["Valor recebido", "Valor Recebido", "Valor recebido total", "Recebido"]],
         [COLUMN_MAP.taxaAtivacao, ["Taxa de ativação", "Taxa de ativacao", "Taxa de ativacao ", "Taxa ativação"]],
         [COLUMN_MAP.descricaoCancelamento, ["Descrição do cancelamento", "Descricao do cancelamento"]],
         [COLUMN_MAP.dataCancelamento, ["Data do cancelamento", "Data do cancelamento "]],
@@ -299,7 +389,7 @@ function parseCsvFile(file) {
                             .some(value => String(value || "").trim() !== "")
                     )
                     .map(normalizeRowHeaders)
-                resolve(rows)
+                resolve(rows.map(applyLeoProspectSeller))
             },
             error: function (error) {
                 reject(error)
@@ -308,29 +398,246 @@ function parseCsvFile(file) {
     })
 }
 
-async function handleFile(event) {
-    const newlySelectedFiles = Array.from(event.target.files || [])
+function applyLeoProspectSeller(row) {
+    const prospectFlag = normalizeCsvText(row?.[COLUMN_MAP.prospeccao]).toLowerCase()
+    const isProspectWithoutSeller =
+        prospectFlag === "não" || prospectFlag === "nao"
+    const isOwnershipTransfer = [
+        row?.[COLUMN_MAP.canal],
+        row?.[COLUMN_MAP.canalOrigem],
+        row?.[COLUMN_MAP.campanha]
+    ].some(value => normalizeCsvText(value).toLowerCase() === "troca de titularidade")
+
+    if (!isProspectWithoutSeller || isOwnershipTransfer) return row
+
+    const sellerValues = [
+        row?.[COLUMN_MAP.vendedorProspect],
+        row?.[COLUMN_MAP.vendedor]
+    ]
+    const hasSeller = sellerValues.some(value => {
+        const text = normalizeCsvText(value).toLowerCase()
+        return text && text !== "-" && text !== "--" && text !== "undefined" && text !== "null"
+    })
+
+    if (hasSeller) return row
+
+    return {
+        ...row,
+        [COLUMN_MAP.vendedorProspect]: "Léo",
+        [COLUMN_MAP.vendedor]: "Léo"
+    }
+}
+
+function getSavedShortcuts() {
+    try {
+        const shortcuts = JSON.parse(localStorage.getItem(SHORTCUT_STORAGE_KEY) || "[]")
+        return Array.isArray(shortcuts) ? shortcuts : []
+    } catch (error) {
+        console.warn("Não foi possível ler os atalhos salvos:", error)
+        return []
+    }
+}
+
+function setSavedShortcuts(shortcuts) {
+    localStorage.setItem(SHORTCUT_STORAGE_KEY, JSON.stringify(shortcuts))
+}
+
+function refreshShortcutSelect() {
+    const select = document.getElementById("savedShortcutSelect")
+    if (!select) return
+
+    select.innerHTML = "<option value=\"\">Atalhos salvos</option>"
+    getSavedShortcuts().forEach(shortcut => {
+        const option = document.createElement("option")
+        option.value = shortcut.id
+        option.textContent = shortcut.name
+        select.appendChild(option)
+    })
+
+    updateShortcutActions(select.value)
+}
+
+function updateShortcutActions(shortcutId) {
+    const hasSelection = Boolean(shortcutId)
+    const editButton = document.getElementById("editShortcutButton")
+    const deleteButton = document.getElementById("deleteShortcutButton")
+
+    if (editButton) editButton.disabled = !hasSelection
+    if (deleteButton) deleteButton.disabled = !hasSelection
+}
+
+function openShortcutModal(mode = "create") {
+    const modal = document.getElementById("shortcutModal")
+    const message = document.getElementById("shortcutFormMessage")
+    if (!modal) return
+
+    const select = document.getElementById("savedShortcutSelect")
+    const shortcut = mode === "edit"
+        ? getSavedShortcuts().find(item => item.id === select?.value)
+        : null
+
+    if (mode === "edit" && !shortcut) return
+
+    editingShortcutId = shortcut?.id || ""
+    document.getElementById("shortcutForm")?.reset()
+    document.getElementById("shortcutName").value = shortcut?.name || ""
+    document.getElementById("shortcutModalTitle").textContent = shortcut ? "Editar atalho" : "Criar atalho"
+    document.getElementById("shortcutModalDescription").textContent = shortcut
+        ? "Atualize o nome ou substitua os arquivos salvos."
+        : "Salve um conjunto de arquivos para consultar depois."
+    document.getElementById("shortcutFilesHint").textContent = shortcut
+        ? `${shortcut.files.length} arquivo(s) salvo(s). Selecione novos arquivos para substituir.`
+        : "Selecione um ou mais arquivos."
+    document.getElementById("saveShortcutButton").textContent = shortcut ? "Salvar alterações" : "Salvar atalho"
+    message?.classList.add("hidden")
+    modal.classList.remove("hidden")
+}
+
+function closeShortcutModal() {
+    editingShortcutId = ""
+    document.getElementById("shortcutModal")?.classList.add("hidden")
+}
+
+function showShortcutMessage(message, isError = false) {
+    const element = document.getElementById("shortcutFormMessage")
+    if (!element) return
+
+    element.textContent = message
+    element.classList.toggle("hidden", !message)
+    element.classList.toggle("text-red-300", isError)
+    element.classList.toggle("text-green-300", !isError)
+}
+
+async function saveShortcut(event) {
+    event.preventDefault()
+
+    const name = document.getElementById("shortcutName").value.trim()
+    const files = Array.from(document.getElementById("shortcutFiles").files || [])
+
+    const existingShortcut = editingShortcutId
+        ? getSavedShortcuts().find(shortcut => shortcut.id === editingShortcutId)
+        : null
+
+    if (!name || (!files.length && !existingShortcut)) return
+
+    const duplicateName = getSavedShortcuts().some(shortcut =>
+        shortcut.id !== editingShortcutId && shortcut.name.toLowerCase() === name.toLowerCase()
+    )
+    if (duplicateName) {
+        showShortcutMessage("Já existe um atalho com esse nome.", true)
+        return
+    }
+
+    const shortcutFiles = files.length
+        ? await Promise.all(files.map(async file => ({
+            name: file.name,
+            type: file.type || "text/csv",
+            lastModified: file.lastModified,
+            content: await file.text()
+        })))
+        : existingShortcut.files
+
+    const shortcut = {
+        id: existingShortcut?.id || `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name,
+        files: shortcutFiles
+    }
+
+    try {
+        const shortcuts = getSavedShortcuts()
+        const updatedShortcuts = existingShortcut
+            ? shortcuts.map(item => item.id === existingShortcut.id ? shortcut : item)
+            : [...shortcuts, shortcut]
+        setSavedShortcuts(updatedShortcuts)
+    } catch (error) {
+        showShortcutMessage("Não foi possível salvar. O armazenamento do navegador pode estar cheio.", true)
+        return
+    }
+
+    refreshShortcutSelect()
+    document.getElementById("savedShortcutSelect").value = shortcut.id
+    updateShortcutActions(shortcut.id)
+    closeShortcutModal()
+}
+
+function deleteSelectedShortcut() {
+    const select = document.getElementById("savedShortcutSelect")
+    const shortcutId = select?.value
+    const shortcut = getSavedShortcuts().find(item => item.id === shortcutId)
+    if (!shortcut) return
+
+    if (!window.confirm(`Excluir o atalho "${shortcut.name}"?`)) return
+
+    setSavedShortcuts(getSavedShortcuts().filter(item => item.id !== shortcutId))
+    refreshShortcutSelect()
+    select.value = ""
+    updateShortcutActions("")
+    editingShortcutId = ""
+}
+
+async function loadShortcut(shortcutId) {
+    const select = document.getElementById("savedShortcutSelect")
+    if (!shortcutId) return
+
+    const shortcut = getSavedShortcuts().find(item => item.id === shortcutId)
+    if (!shortcut) {
+        refreshShortcutSelect()
+        return
+    }
+
+    const files = shortcut.files.map(file => new File(
+        [file.content],
+        file.name,
+        { type: file.type || "text/csv", lastModified: file.lastModified }
+    ))
+
+    try {
+        await processCsvFiles(files, true)
+    } catch (error) {
+        console.error("Erro ao carregar atalho:", error)
+    } finally {
+        if (select) {
+            select.value = shortcutId
+            updateShortcutActions(shortcutId)
+        }
+    }
+}
+
+async function processCsvFiles(newlySelectedFiles, replaceUploadedFiles = false) {
+    const baseFiles = replaceUploadedFiles ? [] : uploadedCsvFiles
 
     if (!newlySelectedFiles.length) return
 
     const uniqueFiles = Array.from(
         new Map(
-            [...uploadedCsvFiles, ...newlySelectedFiles]
+            [...baseFiles, ...newlySelectedFiles]
                 .map(file => [`${file.name}|${file.size}|${file.lastModified}`, file])
         ).values()
     )
 
     uploadedCsvFiles = uniqueFiles
+
+    const parsedFiles = await Promise.all(uploadedCsvFiles.map(parseCsvFile))
+    const parsedRows = parsedFiles.flat()
+    const receivedByContract = buildReceivedByContract(parsedRows)
+    const operationalRows = parsedRows.filter(row => !isReceivedPaymentRow(row))
+    const mergedRows = mergeCsvRows(operationalRows)
+    rawData = attachReceivedValues(mergedRows, receivedByContract).map(applyBusinessRules)
+    window.receivedByContract = Object.fromEntries(receivedByContract.entries())
+
+    populateFilters(rawData)
+    showDashboard()
+    applyFilters()
+}
+
+async function handleFile(event) {
+    const newlySelectedFiles = Array.from(event.target.files || [])
     event.target.value = ""
 
-    try {
-        const parsedFiles = await Promise.all(uploadedCsvFiles.map(parseCsvFile))
-        const mergedRows = mergeCsvRows(parsedFiles.flat())
-        rawData = mergedRows.map(applyBusinessRules)
+    if (!newlySelectedFiles.length) return
 
-        populateFilters(rawData)
-        showDashboard()
-        applyFilters()
+    try {
+        await processCsvFiles(newlySelectedFiles)
     } catch (error) {
         console.error("Erro ao processar CSVs:", error)
     }
