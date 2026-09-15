@@ -258,9 +258,7 @@
             background: #35251e !important;
             border: 1px solid #876247 !important;
             color: #f3e2cc !important;
-            width: min(96vw, 1600px);
             max-height: min(88vh, 860px);
-            overflow: hidden;
             border-radius: 0.5rem;
             box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(226, 164, 99, 0.08);
         }
@@ -335,7 +333,6 @@
         #rankingDetailTableWrap {
             max-height: 58vh;
             overflow: auto;
-            padding: 0.75rem 1.25rem 1.25rem;
             background: #35251e;
             scrollbar-color: #876247 #2b1e18;
             scrollbar-width: thin;
@@ -438,29 +435,22 @@
         }
 
         @media (max-width: 640px) {
-            #rankingDetailModal {
-                padding: 0.65rem;
-            }
-
             #rankingDetailModal > div {
                 width: 100%;
                 max-height: 92vh;
             }
 
-            #rankingDetailTableWrap {
-                padding: 0.75rem;
-            }
 
             #rankingDetailModal .ranking-detail-header {
                 min-height: 96px;
                 padding: 1rem;
             }
 
-            #rankingDetailModal .ranking-tabs,
+            /* #rankingDetailModal .ranking-tabs,
             #rankingDetailTableWrap {
                 padding-left: 1rem;
                 padding-right: 1rem;
-            }
+            } */
 
             #rankingDetailModal #closeRankingDetailModal {
                 padding: 0.45rem 0.65rem !important;
@@ -634,8 +624,8 @@
                     <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="channel">Canais</button>
                     <button type="button" class="ranking-tab px-3 py-2 text-xs font-semibold" data-ranking-tab="plan">Planos</button>
                 </div>
-                <div id="rankingDetailTableWrap" class="px-5 pb-5">
-                    <table id="rankingDetailTable" class="min-w-full text-sm">
+                <div id="rankingDetailTableWrap">
+                    <table id="rankingDetailTable" class="text-sm">
                         <thead><tr id="rankingDetailHeader"></tr></thead>
                         <tbody id="rankingDetailBody"></tbody>
                     </table>
@@ -1046,7 +1036,7 @@
                 Nenhum registro encontrado para este filtro.
             </div>
 
-            <div class="overflow-auto ml-0 px-3 pb-3">
+            <div class="overflow-auto ml-0">
                 <table class="min-w-full text-sm">
                     <thead
                         class="bg-[#5a3e2d] text-xs font-semibold uppercase tracking-wide text-[#f3e2cc] sticky top-0">

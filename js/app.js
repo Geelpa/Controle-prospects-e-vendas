@@ -525,6 +525,15 @@ function renderRankingDetail(category = activeRankingCategory) {
         return (activeRankingSort.direction === "asc" ? comparison : -comparison) ||
             second.score - first.score || second.won - first.won;
     });
+    const rankingPositionByEntry = new Map(
+        [...(activeRankingViews[category] || [])]
+            .sort((first, second) =>
+                second.score - first.score ||
+                second.won - first.won ||
+                first.label.localeCompare(second.label, "pt-BR")
+            )
+            .map((entry, index) => [entry, index + 1])
+    );
 
     if (!modal || !title || !subtitle || !header || !body) return;
 
@@ -541,7 +550,7 @@ function renderRankingDetail(category = activeRankingCategory) {
     entries.forEach((entry, index) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-            <td>${index + 1}o</td>
+            <td>${rankingPositionByEntry.get(entry) || index + 1}o</td>
             <td class="font-semibold text-[#fff4e5]">${entry.label}</td>
             <td>${entry.won}</td>
             ${category === "plan" ? "" : `<td>${entry.conversion.toFixed(1).replace(".", ",")}%</td>`}

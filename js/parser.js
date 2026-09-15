@@ -211,12 +211,47 @@ function buildReceivedByContract(rows) {
         const amount = parseCurrencyLike(row[COLUMN_MAP.valorRecebido])
         if (!amount) return
 
-        getContractKeys(row).forEach(key => {
-            receivedByContract.set(key, (receivedByContract.get(key) || 0) + amount)
-        })
+        const contractKey = normalizeContractKey(row?.[COLUMN_MAP.idContrato]) || getContractKeys(row)[0]
+        if (!contractKey) return
+
+        receivedByContract.set(contractKey, (receivedByContract.get(contractKey) || 0) + amount)
     })
 
     return receivedByContract
+}
+
+function buildContractDetailsByContract(rows) {
+    const detailsByContract = new Map()
+
+    rows.filter(isReceivedPaymentRow).forEach(row => {
+        const contractKey = normalizeContractKey(row?.[COLUMN_MAP.idContrato]) || getContractKeys(row)[0]
+        if (!contractKey) return
+
+        const existing = detailsByContract.get(contractKey)
+        detailsByContract.set(contractKey, existing ? mergeRowData(existing, row) : { ...row })
+    })
+
+    return detailsByContract
+}
+
+function attachContractData(rows, contractDetailsByContract) {
+    const matchedContracts = new Set()
+    const enrichedRows = rows.map(row => {
+        const contractKey = getContractKeys(row)
+            .map(key => contractDetailsByContract.has(key) ? key : "")
+            .find(Boolean)
+
+        if (!contractKey) return row
+
+        matchedContracts.add(contractKey)
+        return mergeRowData(row, contractDetailsByContract.get(contractKey))
+    })
+
+    contractDetailsByContract.forEach((detail, contractKey) => {
+        if (!matchedContracts.has(contractKey)) enrichedRows.push(detail)
+    })
+
+    return enrichedRows
 }
 
 function attachReceivedValues(rows, receivedByContract) {
@@ -620,9 +655,11 @@ async function processCsvFiles(newlySelectedFiles, replaceUploadedFiles = false)
     const parsedFiles = await Promise.all(uploadedCsvFiles.map(parseCsvFile))
     const parsedRows = parsedFiles.flat()
     const receivedByContract = buildReceivedByContract(parsedRows)
+    const contractDetailsByContract = buildContractDetailsByContract(parsedRows)
     const operationalRows = parsedRows.filter(row => !isReceivedPaymentRow(row))
     const mergedRows = mergeCsvRows(operationalRows)
-    rawData = attachReceivedValues(mergedRows, receivedByContract).map(applyBusinessRules)
+    const enrichedRows = attachContractData(mergedRows, contractDetailsByContract)
+    rawData = attachReceivedValues(enrichedRows, receivedByContract).map(applyBusinessRules)
     window.receivedByContract = Object.fromEntries(receivedByContract.entries())
 
     populateFilters(rawData)
