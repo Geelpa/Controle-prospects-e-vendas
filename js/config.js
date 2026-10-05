@@ -3,9 +3,11 @@ let installationChart
 let rawData = []
 let currentFilteredData = []
 let currentProspectFilteredData = []
+let currentDashboardMetrics = null
 
 const COLUMN_MAP = {
     id: "ID",
+    idProspect: "ID Prospect",
     razao: "Razão",
     statusContrato: "Status contrato",
     latitudeProspect: "Latitude Prospect",

@@ -355,6 +355,18 @@ function resolvePlanDisplayName(value) {
     return raw
 }
 
+function getProspectSellerValue(row) {
+    const prospectSeller = getField(row, COLUMN_MAP.vendedorProspect, [
+        "Vendedor Prospect",
+        "Vendedor prospect",
+        "Vendedor do prospect"
+    ])
+
+    if (prospectSeller === undefined || prospectSeller === null) return ""
+    const seller = String(prospectSeller).trim()
+    return ["", "-", "--", "undefined", "null"].includes(seller.toLowerCase()) ? "" : seller
+}
+
 function getSellerValue(row) {
     const contractSeller = getField(row, COLUMN_MAP.vendedorContrato, [
         "Vendedor Contrato",
@@ -365,28 +377,12 @@ function getSellerValue(row) {
         "Contrato Vendedor"
     ])
 
-    if (contractSeller !== undefined && contractSeller !== null && String(contractSeller).trim() !== "" && String(contractSeller).trim() !== "undefined") {
+    if (contractSeller !== undefined && contractSeller !== null && !["", "-", "--", "undefined", "null"].includes(String(contractSeller).trim().toLowerCase())) {
         return String(contractSeller).trim()
-    }
-
-    const prospectSeller = getField(row, COLUMN_MAP.vendedorProspect, [
-        "Vendedor Prospect",
-        "Vendedor prospect",
-        "Vendedor do prospect"
-    ])
-    const normalizedStatus = normalize(String(row?.[COLUMN_MAP.status] || ""))
-    const hasWonContract = normalizedStatus === "vencemos" ||
-        String(row?.[COLUMN_MAP.statusContrato] || "").trim() !== ""
-
-    if (!hasWonContract && prospectSeller !== undefined && prospectSeller !== null && String(prospectSeller).trim() !== "" && String(prospectSeller).trim() !== "undefined") {
-        return String(prospectSeller).trim()
     }
 
     const responsibleSeller = getField(row, COLUMN_MAP.vendedor, [
         "Vendedor",
-        "Vendedor Prospect",
-        "Vendedor prospect",
-        "Vendedor do prospect",
         "Vendedor Comercial",
         "Vendedor comercial",
         "Vendedor responsável",
@@ -397,11 +393,8 @@ function getSellerValue(row) {
     ])
 
     if (responsibleSeller !== undefined && responsibleSeller !== null && String(responsibleSeller).trim() !== "" && String(responsibleSeller).trim() !== "undefined") {
-        return String(responsibleSeller).trim()
-    }
-
-    if (prospectSeller !== undefined && prospectSeller !== null && String(prospectSeller).trim() !== "" && String(prospectSeller).trim() !== "undefined") {
-        return String(prospectSeller).trim()
+        const seller = String(responsibleSeller).trim()
+        return ["-", "--", "undefined", "null"].includes(seller.toLowerCase()) ? "" : seller
     }
 
     return ""
@@ -417,11 +410,9 @@ function getContractSellerValue(row) {
         "Contrato Vendedor"
     ])
 
-    if (contractSeller !== undefined && contractSeller !== null && String(contractSeller).trim() !== "" && String(contractSeller).trim() !== "undefined") {
-        return String(contractSeller).trim()
-    }
-
-    return getSellerValue(row)
+    if (contractSeller === undefined || contractSeller === null) return ""
+    const seller = String(contractSeller).trim()
+    return ["", "-", "--", "undefined", "null"].includes(seller.toLowerCase()) ? "" : seller
 }
 
 function groupBy(data, columnName) {

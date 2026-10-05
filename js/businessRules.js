@@ -27,6 +27,14 @@ const isAdditionalPlan = (item, map = COLUMN_MAP) => {
 const isNewProspect = (item, map = COLUMN_MAP) =>
     !isAdditionalPlan(item, map);
 
+function getProspectStatusCategory(item) {
+    const status = normalize(item?.[COLUMN_MAP.status])
+    if (STATUS.lost.includes(status)) return "lost"
+    if (STATUS.noViability.includes(status)) return "noViability"
+    if (STATUS.inProgress.includes(status)) return "inProgress"
+    return "other"
+}
+
 // Uma venda é real quando o contrato está em um status válido e possui valor.
 const isRealWonSale = (item, COLUMN_MAP) => {
     const contractCategory = getContractStatusCategory(item)

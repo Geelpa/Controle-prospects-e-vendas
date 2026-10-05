@@ -37,7 +37,8 @@ const LIST_COLUMN_CANDIDATES = [
     COLUMN_MAP.statusContrato,
     COLUMN_MAP.cep,
     COLUMN_MAP.motivoPerda,
-    COLUMN_MAP.vendedor,
+    COLUMN_MAP.vendedorProspect,
+    COLUMN_MAP.vendedorContrato,
     COLUMN_MAP.plano,
     COLUMN_MAP.canal,
     COLUMN_MAP.campanha,
@@ -125,67 +126,6 @@ function closeProspectList() {
     }
 }
 
-function getRowsByDrilldownType(type) {
-    const rows = currentFilteredData || []
-
-    if (type === "prospects") {
-        return rows
-    }
-
-    if (type === "inProgress") {
-        return rows.filter(item =>
-            STATUS.inProgress.includes(
-                normalize(item[COLUMN_MAP.status])
-            )
-        )
-    }
-
-    if (type === "won") {
-        return getUniqueWonRows(rows)
-    }
-
-    if (type === "lost") {
-        return rows.filter(item =>
-            STATUS.lost.includes(
-                normalize(item[COLUMN_MAP.status])
-            )
-        )
-    }
-
-    if (type === "noViability") {
-        return rows.filter(item =>
-            STATUS.noViability.includes(
-                normalize(item[COLUMN_MAP.status])
-            )
-        )
-    }
-
-    if (type === "inactive") {
-        return rows.filter(isInactiveContract)
-    }
-    if (type === "alreadyClients") {
-        return getUniqueWonRows(rows.filter(item => isAdditionalPlan(item, COLUMN_MAP)))
-    }
-
-    if (["preContract", "withdrawn", "cancelled"].includes(type)) {
-        return rows.filter(item => getContractStatusCategory(item) === type)
-    }
-
-    if (type === "installationPaid") {
-        return getUniqueWonRows(rows).filter(item => !isFreeInstallation(item))
-    }
-
-    if (type === "taxPaid") {
-        return rows.filter(item => parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0)
-    }
-
-    if (type === "installationFree") {
-        return getUniqueWonRows(rows).filter(item => isFreeInstallation(item))
-    }
-
-    return []
-}
-
 function isWon(item) {
     return isRealWonSale(item, COLUMN_MAP)
 }
@@ -198,17 +138,14 @@ function isFreeInstallation(item) {
 function sanitizeSellerFieldsForModal(rows) {
     return rows.map(row => {
         const normalizedRow = { ...row }
-        const resolvedSeller = getSellerValue(normalizedRow)
-
-        if (resolvedSeller) {
-            normalizedRow[COLUMN_MAP.vendedor] = resolvedSeller
-        }
+        normalizedRow[COLUMN_MAP.vendedorProspect] = getProspectSellerValue(normalizedRow)
+        normalizedRow[COLUMN_MAP.vendedorContrato] = getContractSellerValue(normalizedRow)
 
         Object.keys(normalizedRow).forEach(key => {
-            const lowerKey = normalize(key)
             if (
-                lowerKey.includes("vendedor") &&
-                normalize(key) !== normalize(COLUMN_MAP.vendedor)
+                normalize(key).includes("vendedor") &&
+                ![COLUMN_MAP.vendedorProspect, COLUMN_MAP.vendedorContrato]
+                    .some(field => normalize(key) === normalize(field))
             ) {
                 delete normalizedRow[key]
             }
@@ -259,17 +196,6 @@ function renderProspectTable(rows, options = {}) {
         hiddenColumns.push("Status")
     }
 
-    hiddenColumns.push("Vendedor Contrato")
-    hiddenColumns.push("Vendedor do contrato")
-    hiddenColumns.push("Vendedor contrato")
-    hiddenColumns.push("Vendedor de contrato")
-    hiddenColumns.push("Vendedor Prospect")
-    hiddenColumns.push("Vendedor prospect")
-    hiddenColumns.push("Vendedor do prospect")
-    hiddenColumns.push("Vendedor comercial")
-    hiddenColumns.push("Vendedor Comercial")
-    hiddenColumns.push("Consultor")
-
     // 3. Filtra as colunas comparando a chave original e o label visível
     const columns = getListColumns(displayRows)
         .filter(column => {
@@ -312,7 +238,8 @@ function getListColumns(rows) {
     if (!rows.length) {
         return [
             COLUMN_MAP.status,
-            COLUMN_MAP.vendedor,
+            COLUMN_MAP.vendedorProspect,
+            COLUMN_MAP.vendedorContrato,
             COLUMN_MAP.plano,
             COLUMN_MAP.canal,
             COLUMN_MAP.campanha,

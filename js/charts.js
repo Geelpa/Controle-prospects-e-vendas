@@ -546,6 +546,10 @@ function getChartDisplayValue(item, columnName) {
 }
 
 function getChartDedupKey(item) {
+    if (typeof isWon === "function" && isWon(item) && typeof getWinDedupKey === "function") {
+        return getWinDedupKey(item)
+    }
+
     const candidates = [
         item?.[COLUMN_MAP.id],
         item?.["ID Prospect"],
@@ -795,6 +799,9 @@ function getSalesDateKey(date, state = getSalesChartState()) {
 }
 
 function sortSalesDateKeys(first, second) {
+    if (first === "sem-data") return second === "sem-data" ? 0 : 1
+    if (second === "sem-data") return -1
+
     if (first.length === 7 && second.length === 7) {
         return first.localeCompare(second)
     }
@@ -803,6 +810,8 @@ function sortSalesDateKeys(first, second) {
 }
 
 function formatSalesDateLabel(key, state = getSalesChartState()) {
+    if (key === "sem-data") return "Sem data"
+
     if (key.length === 7) {
         const [year, month] = key.split("-")
 
@@ -1225,7 +1234,7 @@ function createLegacyLossesPerDayChart(data) {
     )
 }
 
-function createSalesPerDayChart(data, prospectRows = []) {
+function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashboardMetrics) {
 
     destroyChart(salesPerDayChart)
 
@@ -1235,10 +1244,18 @@ function createSalesPerDayChart(data, prospectRows = []) {
     const uniqueKeys = new Set()
 
     data.forEach(item => {
+        const isWonRow = isWon(item)
+        if (isWonRow) {
+            const uniqueKey = `won:${getWinDedupKey(item)}`
+            if (uniqueKeys.has(uniqueKey)) return
+
+            uniqueKeys.add(uniqueKey)
+            uniqueData.push(item)
+            return
+        }
+
         const status = normalize(item?.[COLUMN_MAP.status])
-        const statusKey = STATUS.won.includes(status)
-            ? "won"
-            : isNoViabilityStatus(item)
+        const statusKey = isNoViabilityStatus(item)
                 ? "noViability"
                 : isLostStatus(item)
                     ? "lost"
@@ -1267,7 +1284,8 @@ function createSalesPerDayChart(data, prospectRows = []) {
         rowsByPeriod[key].push(item)
     }
 
-    const uniqueProspects = getDeduplicatedChartRows(prospectRows)
+    const uniqueProspects = metrics?.prospects || getDeduplicatedChartRows(prospectRows)
+    const inProgressRows = new Set(metrics?.prospectStatusRows.inProgress || [])
 
     uniqueProspects.forEach(item => {
         const parsedDate = extractRegistrationDate(item)
@@ -1279,6 +1297,7 @@ function createSalesPerDayChart(data, prospectRows = []) {
         if (!grouped[key]) {
             grouped[key] = {
                 prospects: 0,
+                inProgress: 0,
                 won: 0,
                 lost: 0,
                 noViability: 0
@@ -1288,28 +1307,32 @@ function createSalesPerDayChart(data, prospectRows = []) {
         }
 
         grouped[key].prospects++
+        if (inProgressRows.has(item)) grouped[key].inProgress++
         addRowToPeriod(key, item)
     })
 
     uniqueData.forEach(item => {
         const status = normalize(item?.[COLUMN_MAP.status])
-        const isWonRow = STATUS.won.includes(status)
+        const isWonRow = isWon(item)
         const isLostRow = isLossStatus(item)
 
         if (!isWonRow && !isLostRow) return
 
         const parsedDate = isWonRow
-            ? extractActivationDate(item)
+            ? extractActivationDate(item) || extractRegistrationDate(item)
             : extractRegistrationDate(item)
 
-        if (!parsedDate) return
-
-        const key = getSalesDateKey(parsedDate, chartState)
+        const key = parsedDate
+            ? getSalesDateKey(parsedDate, chartState)
+            : isWonRow
+                ? "sem-data"
+                : null
         if (!key) return
 
         if (!grouped[key]) {
             grouped[key] = {
                 prospects: 0,
+                inProgress: 0,
                 won: 0,
                 lost: 0,
                 noViability: 0
@@ -1350,6 +1373,19 @@ function createSalesPerDayChart(data, prospectRows = []) {
             data: {
                 labels,
                 datasets: [
+                    {
+                        label: "Em andamento",
+                        data: sortedEntries.map(([_, values]) => values.inProgress),
+                        tension: 0.35,
+                        fill: false,
+                        borderColor: CHART_COLORS.amber,
+                        backgroundColor: CHART_COLORS.amber,
+                        pointBackgroundColor: CHART_COLORS.amber,
+                        pointBorderColor: CHART_COLORS.amber,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 3
+                    },
                     {
                         label: "Prospectados",
                         data: sortedEntries.map(([_, values]) => values.prospects),

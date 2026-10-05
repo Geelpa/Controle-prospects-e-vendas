@@ -5,18 +5,19 @@ function processData(prospectData, salesData) {
     };
 
     salesData = (salesData || []).map(applyBusinessRules);
+    currentDashboardMetrics = buildDashboardMetrics(prospectData, salesData);
 
     // --- BLOCO 1: CONVERSÃO E QUANTIDADES COMERCIAIS (VERSÃO DE ALTA PRECISÃO - 124) ---
 
-    const prospectsData = (prospectData || []).filter(item => isNewProspect(item, COLUMN_MAP));
-    currentFilteredData = salesData || [];
+    const prospectsData = currentDashboardMetrics.prospects;
+    currentFilteredData = currentDashboardMetrics.salesRows;
     currentProspectFilteredData = prospectsData;
     const currentProspectData = prospectsData;
     const totalProspects = prospectsData.length;
 
     // As vendas e ativações devem considerar também adicionais e troca de titularidade,
     // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
-    const wonRows = getUniqueWonRows(salesData || []);
+    const wonRows = currentDashboardMetrics.wonRows;
     const won = wonRows.length;
     const conversionWonRows = wonRows.filter(item =>
         !isAdditionalPlan(item, COLUMN_MAP) &&
@@ -25,17 +26,13 @@ function processData(prospectData, salesData) {
     const alreadyClients = getUniqueWonRows(
         (salesData || []).filter(item => isAdditionalPlan(item, COLUMN_MAP))
     ).length;
-    const salesPerformanceRows = wonRows.filter(item => !isOwnershipTransferChannel(item));
+    const salesPerformanceRows = wonRows;
 
     // PERDEMOS: apenas status 'perdemos'
-    const lost = prospectsData.filter(item =>
-        STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
-    ).length;
+    const lost = currentDashboardMetrics.prospectStatusRows.lost.length;
 
     // SEM VIABILIDADE: apenas status 'sem viabilidade'
-    const noViability = prospectsData.filter(item =>
-        STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
-    ).length;
+    const noViability = currentDashboardMetrics.prospectStatusRows.noViability.length;
 
     const contractStatusRows = salesData || [];
     const countContractCategory = category => contractStatusRows.filter(item =>
@@ -46,15 +43,7 @@ function processData(prospectData, salesData) {
     const cancelled = countContractCategory("cancelled");
 
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
-    const inProgress = prospectsData.filter(item => {
-        const s = normalize(item[COLUMN_MAP.status]);
-        return (
-            !STATUS.won.includes(s) &&
-            !STATUS.lost.includes(s) &&
-            !STATUS.noViability.includes(s) &&
-            s !== "abortamos"
-        )
-    }).length;
+    const inProgress = currentDashboardMetrics.prospectStatusRows.inProgress.length;
 
     // Conversão: compara apenas oportunidades concluídas de aquisição (ganhas ou perdidas).
     // Planos adicionais e trocas de titularidade não são oportunidades novas.
@@ -123,7 +112,7 @@ function processData(prospectData, salesData) {
 
     // Executa a auditoria consolidada para ajudar a diagnosticar diferenças com o IXC
     try {
-        logDashboardAudit(salesData || [], prospectsData, isNewProspect);
+        logDashboardAudit(salesData || [], prospectsData, isNewProspect, currentDashboardMetrics);
     } catch (e) { /** não quebrar a execução */ }
      // === FUNÇÃO DE AUDITORIA DE VENDEDOR PARA GRÁFICOS E PÓDIOS ===
     // Retorna o Vendedor do Contrato se existir, caso contrário mantém o do Prospect.
@@ -142,7 +131,7 @@ function processData(prospectData, salesData) {
         [COLUMN_MAP.vendedor]: getSellersName(item)
     }));
 
-    updateTopRanking(salesData || [], chartDataWithCorrectSellers);
+    updateTopRanking(currentDashboardMetrics, chartDataWithCorrectSellers);
 
     // Gráficos de desempenho devem seguir a base real de vendas e manter status perdidos/andamento
     // para comparação; só o canal de venda exclui Troca de Titularidade.
@@ -151,22 +140,44 @@ function processData(prospectData, salesData) {
     if (typeof createInstallationChart === "function") createInstallationChart(chartDataWithCorrectSellers);
     if (typeof createSalesPerDayChart === "function") {
         const resultChartRows = [
-            ...(salesData || []).filter(item =>
-                STATUS.won.includes(normalize(item?.[COLUMN_MAP.status]))
-            ),
-            ...(prospectsData || []).filter(item => {
-                const status = normalize(item?.[COLUMN_MAP.status])
-                return STATUS.won.includes(status) || isLossStatus(item)
-            })
+            ...wonRows,
+            ...currentDashboardMetrics.prospectStatusRows.lost,
+            ...currentDashboardMetrics.prospectStatusRows.noViability
         ];
 
-        createSalesPerDayChart(resultChartRows, prospectsData);
+        createSalesPerDayChart(resultChartRows, prospectsData, currentDashboardMetrics);
     }
 
     // Gráficos de funil e comparação de status continuam na base completa filtrada (vendas/ativação).
     if (typeof createChannelsChart === "function") createChannelsChart(salesData || []);
     if (typeof createCampaignsChart === "function") createCampaignsChart(salesData || []);
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(salesData || []);
+}
+
+function buildDashboardMetrics(prospectData, salesData) {
+    const prospects = (prospectData || []).filter(item => isNewProspect(item, COLUMN_MAP));
+    const salesRows = salesData || [];
+    const prospectStatusRows = {
+        won: [],
+        lost: [],
+        noViability: [],
+        inProgress: [],
+        other: []
+    };
+
+    prospects.forEach(item => {
+        prospectStatusRows[getProspectStatusCategory(item)].push(item);
+    });
+
+    const wonRows = getUniqueWonRows(salesRows);
+    const rankingRows = [
+        ...wonRows,
+        ...getDeduplicatedChartRows(salesRows.filter(item => !isWon(item)))
+    ].filter(item =>
+        isWon(item) || isLossStatus(item) || isRankingContractPenalty(item)
+    );
+
+    return { prospects, salesRows, prospectStatusRows, wonRows, rankingRows };
 }
 
 function getRankingGroupLabel(item, columnName) {
@@ -209,13 +220,26 @@ function isRankingContractPenalty(item) {
         STATUS.contractWithdrawn.includes(contractStatus);
 }
 
-function getRankingGroupMetrics(rows, columnName, referenceDate = new Date()) {
+function isExcludedRankingPlan(label) {
+    const normalizedLabel = String(label || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    return /\b(exclusiv[oa]s?|test(e|es|ando|ado)?|sem\s+plano|nenhum\s+plano|plano\s+nao\s+definido)\b/.test(normalizedLabel);
+}
+
+function getRankingGroupMetrics(rows, columnName, referenceDate = new Date(), includeActivationTax = false) {
     const grouped = new Map();
 
     rows.forEach(item => {
         if (!isWon(item) && !isLossStatus(item) && !isRankingContractPenalty(item)) return;
 
         const label = getRankingGroupLabel(item, columnName);
+        if (columnName === COLUMN_MAP.plano && isExcludedRankingPlan(label)) return;
+
         const key = normalize(label);
         if (!key || key === "undefined") return;
 
@@ -226,6 +250,8 @@ function getRankingGroupMetrics(rows, columnName, referenceDate = new Date()) {
                 lost: 0,
                 revenue: 0,
                 received: 0,
+                activationTax: 0,
+                totalCollected: 0,
                 durationMonths: 0,
                 durationCount: 0,
                 cancelled: 0,
@@ -246,7 +272,13 @@ function getRankingGroupMetrics(rows, columnName, referenceDate = new Date()) {
         if (isWon(item)) {
             entry.won++;
             entry.revenue += parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato]);
-            entry.received += parseCurrencyNumber(item?.[COLUMN_MAP.valorRecebido]);
+            const received = parseCurrencyNumber(item?.[COLUMN_MAP.valorRecebido]);
+            const activationTax = includeActivationTax
+                ? Math.max(0, parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]))
+                : 0;
+            entry.received += received;
+            entry.activationTax += activationTax;
+            entry.totalCollected += received + activationTax;
         } else if (isLostStatus(item)) {
             entry.lost++;
         } else if (isRankingContractPenalty(item)) {
@@ -282,7 +314,8 @@ function getRankingScore(entry, options) {
     }
 
     if (options.type === "plan") {
-        const averageReceived = entry.won ? entry.received / entry.won : 0;
+        const averageReceived = entry.won ? entry.totalCollected / entry.won : 0;
+        const totalCollected = options.maxReceived ? entry.totalCollected / options.maxReceived : 0;
         const receivedPerActivation = options.maxAverageReceived
             ? averageReceived / options.maxAverageReceived
             : 0;
@@ -290,7 +323,7 @@ function getRankingScore(entry, options) {
         const durationScore = options.maxAverageDuration
             ? averageDuration / options.maxAverageDuration
             : 0;
-        return conversion / 100 * 0.25 + volume * 0.1 + received * 0.25 + receivedPerActivation * 0.15 + durationScore * 0.15 + consistency * 0.1 - cancellationRate * 0.1;
+        return conversion / 100 * 0.25 + volume * 0.1 + totalCollected * 0.25 + receivedPerActivation * 0.15 + durationScore * 0.15 + consistency * 0.1 - cancellationRate * 0.1;
     }
 
     const averageTicket = entry.won ? entry.revenue / entry.won : 0;
@@ -307,6 +340,7 @@ function enrichRankingEntries(entries, options) {
         score: getRankingScore(entry, options),
         averageTicket: entry.won ? entry.revenue / entry.won : 0,
         averageReceived: entry.won ? entry.received / entry.won : 0,
+        averageCollected: entry.won ? entry.totalCollected / entry.won : 0,
         averageDuration: entry.durationCount ? entry.durationMonths / entry.durationCount : 0,
         cancellationRate: entry.won + entry.cancelled > 0
             ? (entry.cancelled / (entry.won + entry.cancelled)) * 100
@@ -350,7 +384,7 @@ function formatRankingConversion(entry, includeRevenue = false) {
     return details.join(" • ");
 }
 
-function updateTopRanking(salesRows, sellerRows) {
+function updateTopRanking(metrics, sellerRows) {
     const ranking = document.getElementById("topRanking");
     if (!ranking) return;
 
@@ -362,14 +396,12 @@ function updateTopRanking(salesRows, sellerRows) {
         direction: "desc"
     };
 
-    const normalizedSalesRows = (salesRows || []).map(applyBusinessRules);
-    const uniqueRows = getDeduplicatedChartRows(normalizedSalesRows)
-        .filter(item => !isOwnershipTransferChannel(item));
-    const allRankingRows = uniqueRows.filter(item =>
-        isWon(item) || isLossStatus(item) || isRankingContractPenalty(item)
-    );
+    const normalizedSalesRows = metrics.salesRows;
+    const allRankingRows = metrics.rankingRows;
     const rankingReferenceDate = new Date();
-    const acquisitionRows = allRankingRows.filter(item => !isAdditionalPlan(item, COLUMN_MAP));
+    const acquisitionRows = allRankingRows.filter(item =>
+        !isAdditionalPlan(item, COLUMN_MAP) && !isOwnershipTransferChannel(item)
+    );
     const totalMonths = new Set(allRankingRows.map(getRankingMonthKey).filter(Boolean)).size;
     const acquisitionMonths = new Set(acquisitionRows.map(getRankingMonthKey).filter(Boolean)).size;
     const totalWon = allRankingRows.filter(isWon).length;
@@ -406,14 +438,14 @@ function updateTopRanking(salesRows, sellerRows) {
     });
     const topCampaign = getBestRankingEntry(campaignEntries, conversionOptions(campaignEntries));
     const topChannel = getBestRankingEntry(channelEntries, conversionOptions(channelEntries));
-    const planEntries = getRankingGroupMetrics(allRankingRows, COLUMN_MAP.plano, rankingReferenceDate);
+    const planEntries = getRankingGroupMetrics(allRankingRows, COLUMN_MAP.plano, rankingReferenceDate, true);
     const planOptions = {
         type: "plan",
         globalConversion,
         totalMonths,
         maxWon: Math.max(...planEntries.map(entry => entry.won), 0),
-        maxReceived: Math.max(...planEntries.map(entry => entry.received), 0),
-        maxAverageReceived: Math.max(...planEntries.map(entry => entry.won ? entry.received / entry.won : 0), 0),
+        maxReceived: Math.max(...planEntries.map(entry => entry.totalCollected), 0),
+        maxAverageReceived: Math.max(...planEntries.map(entry => entry.won ? entry.totalCollected / entry.won : 0), 0),
         maxAverageDuration: Math.max(...planEntries.map(entry => entry.durationCount ? entry.durationMonths / entry.durationCount : 0), 0)
     };
     const topPlan = getBestRankingEntry(planEntries, planOptions);
@@ -446,8 +478,8 @@ function updateTopRanking(salesRows, sellerRows) {
         : "Nenhum com 5 ativações";
     document.getElementById("topPlanName").textContent = topPlan?.label || "Sem plano elegível";
     document.getElementById("topPlanDetail").textContent = topPlan
-        ? `${formatRankingMoney(topPlan.received)} recebidos • ${formatRankingMoney(topPlan.averageReceived)} por ativação • ${topPlan.averageDuration.toFixed(1).replace(".", ",")} meses • nota ${(topPlan.score * 100).toFixed(0)}`
-        : "Sem recebimentos no período";
+        ? `${formatRankingMoney(topPlan.totalCollected)} recebido + taxa paga • ${formatRankingMoney(topPlan.averageCollected)} por ativação • ${topPlan.averageDuration.toFixed(1).replace(".", ",")} meses • nota ${(topPlan.score * 100).toFixed(0)}`
+        : "Sem recebimentos ou taxas no período";
 
     ranking.classList.toggle("hidden", !normalizedSalesRows.length);
 }
@@ -468,7 +500,7 @@ function getRankingViewConfig(category) {
         },
         plan: {
             title: "Ranking de planos",
-            subtitle: "Retorno recebido por contrato, considerando volume, consistencia e cancelamentos"
+            subtitle: "Recebimentos e taxas de ativação pagas por plano"
         }
     }[category] || {};
 }
@@ -482,7 +514,8 @@ function getRankingSortHeaders(category) {
     return category === "plan"
         ? [
             ["label", "Plano"], ["won", "Ativacoes"],
-            ["received", "Valor recebido total"], ["averageReceived", "Recebido/ativacao"],
+            ["received", "Recebido"], ["activationTax", "Taxa paga"],
+            ["totalCollected", "Total + taxa"], ["averageCollected", "Total/ativacao"],
             ["averageDuration", "Permanencia media"], ["cancellationRate", "Cancelamentos"], ["score", "Nota"]
         ]
         : [
@@ -544,7 +577,7 @@ function renderRankingDetail(category = activeRankingCategory) {
     body.innerHTML = "";
 
     if (!entries.length) {
-        body.innerHTML = "<tr><td class=\"ranking-empty\" colspan=\"8\">Nenhum participante elegivel para este periodo.</td></tr>";
+        body.innerHTML = `<tr><td class="ranking-empty" colspan="${getRankingSortHeaders(category).length + 1}">Nenhum participante elegivel para este periodo.</td></tr>`;
     }
 
     entries.forEach((entry, index) => {
@@ -555,7 +588,7 @@ function renderRankingDetail(category = activeRankingCategory) {
             <td>${entry.won}</td>
             ${category === "plan" ? "" : `<td>${entry.conversion.toFixed(1).replace(".", ",")}%</td>`}
             <td>${formatRankingMoney(entry.received)}</td>
-            <td>${formatRankingMoney(entry.averageReceived)}</td>
+            ${category === "plan" ? `<td>${formatRankingMoney(entry.activationTax)}</td><td>${formatRankingMoney(entry.totalCollected)}</td><td>${formatRankingMoney(entry.averageCollected)}</td>` : `<td>${formatRankingMoney(entry.averageReceived)}</td>`}
             ${category === "plan" ? "" : `<td>${formatRankingMoney(entry.averageTicket)}</td>`}
             ${category === "plan" ? `<td>${entry.averageDuration.toFixed(1).replace(".", ",")} meses</td>` : ""}
             <td>${entry.cancelled} (${entry.cancellationRate.toFixed(1).replace(".", ",")}%)</td>
@@ -570,7 +603,13 @@ function renderRankingDetail(category = activeRankingCategory) {
     modal.classList.remove("hidden");
 }
 
-function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
+function logDashboardAudit(filteredRows, prospectsRows, isNewProspect, metrics = currentDashboardMetrics) {
+    const activationRows = filteredRows.filter(isWon)
+    const uniqueActivationRows = getUniqueWonRows(filteredRows)
+    const countActivationsBySeller = rows => countBy(rows, item =>
+        normalize(resolveSellerDisplayName(getSellerValue(item))) || "(sem vendedor)"
+    )
+
     const statusCounts = countBy(filteredRows, item =>
         normalize(item[COLUMN_MAP.status]) || "(sem status)"
     );
@@ -579,26 +618,24 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
         normalize(item[COLUMN_MAP.status]) || "(sem status)"
     );
 
-    const strictWonRows = prospectsRows.filter(item =>
+    const strictWonRows = filteredRows.filter(item =>
         STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
     );
 
-    const computedWonRows = prospectsRows.filter(isWon);
+    const computedWonRows = filteredRows.filter(isWon);
 
     const financialOnlyWonRows = computedWonRows.filter(item =>
         !STATUS.won.includes(normalize(item[COLUMN_MAP.status]))
     );
 
-    const lostRows = prospectsRows.filter(item =>
-        !isWon(item) && STATUS.lost.includes(normalize(item[COLUMN_MAP.status]))
+    const lostRows = metrics?.prospectStatusRows.lost || [];
+    const noViabilityRows = metrics?.prospectStatusRows.noViability || [];
+    const inProgressRows = metrics?.prospectStatusRows.inProgress || [];
+    const activationRowsWithReceived = uniqueActivationRows.filter(item =>
+        parseCurrencyNumber(item?.[COLUMN_MAP.valorRecebido]) > 0
     );
-
-    const noViabilityRows = prospectsRows.filter(item =>
-        !isWon(item) && STATUS.noViability.includes(normalize(item[COLUMN_MAP.status]))
-    );
-
-    const inProgressRows = prospectsRows.filter(item =>
-        !isWon(item) && STATUS.inProgress.includes(normalize(item[COLUMN_MAP.status]))
+    const receivedInRankableActivations = activationRowsWithReceived.reduce((total, item) =>
+        total + parseCurrencyNumber(item?.[COLUMN_MAP.valorRecebido]), 0
     );
 
     const additionalRows = filteredRows.filter(item =>
@@ -609,6 +646,9 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
         getDuplicateIdReport(prospectsRows);
 
     const report = {
+        ativacoesValidasAntesDeduplicacao: activationRows.length,
+        ativacoesNoKpiAposDeduplicacao: uniqueActivationRows.length,
+        ativacoesRemovidasPelaDeduplicacao: activationRows.length - uniqueActivationRows.length,
         linhasAposFiltrosCadastro: filteredRows.length,
         prospectsContadosNoDashboard: prospectsRows.length,
         removidosPorRegraAdicional: additionalRows.length,
@@ -618,6 +658,9 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
         vencemosPorStatus: strictWonRows.length,
         vencemosRegraAtual: computedWonRows.length,
         vencemosSomentePorContratoValor: financialOnlyWonRows.length,
+        ativacoesComRecebimentoNoRanking: activationRowsWithReceived.length,
+        ativacoesSemRecebimentoNoRanking: uniqueActivationRows.length - activationRowsWithReceived.length,
+        totalRecebidoNasAtivacoesDoRanking: receivedInRankableActivations,
         perdemosRegraAtual: lostRows.length,
         semViabilidadeRegraAtual: noViabilityRows.length,
         emAndamentoRegraAtual: inProgressRows.length
@@ -629,8 +672,16 @@ function logDashboardAudit(filteredRows, prospectsRows, isNewProspect) {
         prospectStatusCounts,
         additionalRows,
         financialOnlyWonRows,
+        activationRows,
+        uniqueActivationRows,
+        activationsBeforeDeduplicationBySeller: countActivationsBySeller(activationRows),
+        activationsAfterDeduplicationBySeller: countActivationsBySeller(uniqueActivationRows),
         duplicateIds: duplicateIdReport.duplicates
     };
+
+    if (window.receivedAudit) {
+        window.dashboardAudit.receivedAudit = window.receivedAudit;
+    }
 
     if (window.DASHBOARD_DEBUG === true) {
         console.groupCollapsed("Auditoria Dashboard Comercial");
@@ -706,7 +757,7 @@ function renderPodiums(currentData) {
 
 function getPodiumRankingGroups(currentData) {
     const wonOnlyNormal = getUniqueWonRows(currentData).filter(item => !isOwnershipTransferChannel(item));
-    const wonOnlySellers = getUniqueWonRows(currentData).filter(item => !isOwnershipTransferChannel(item));
+    const wonOnlySellers = getUniqueWonRows(currentData);
 
     return [
         {
@@ -877,15 +928,15 @@ function closeProspectList() {
 function sanitizeSellerFieldsForModal(rows) {
     return rows.map(row => {
         const normalizedRow = { ...row };
-        const resolvedSeller = getSellerValue(normalizedRow);
-
-        if (resolvedSeller) {
-            normalizedRow[COLUMN_MAP.vendedor] = resolvedSeller;
-        }
+        normalizedRow[COLUMN_MAP.vendedorProspect] = getProspectSellerValue(normalizedRow);
+        normalizedRow[COLUMN_MAP.vendedorContrato] = getContractSellerValue(normalizedRow);
 
         Object.keys(normalizedRow).forEach(key => {
-            const lowerKey = normalize(key);
-            if (lowerKey.includes("vendedor") && normalize(key) !== normalize(COLUMN_MAP.vendedor)) {
+            if (
+                normalize(key).includes("vendedor") &&
+                ![COLUMN_MAP.vendedorProspect, COLUMN_MAP.vendedorContrato]
+                    .some(field => normalize(key) === normalize(field))
+            ) {
                 delete normalizedRow[key];
             }
         });
@@ -1022,17 +1073,6 @@ function renderProspectTable(rows, options = {}) {
         hiddenColumns.push("Contrato");
     }
 
-    hiddenColumns.push("Vendedor Contrato");
-    hiddenColumns.push("Vendedor do contrato");
-    hiddenColumns.push("Vendedor contrato");
-    hiddenColumns.push("Vendedor de contrato");
-    hiddenColumns.push("Vendedor Prospect");
-    hiddenColumns.push("Vendedor prospect");
-    hiddenColumns.push("Vendedor do prospect");
-    hiddenColumns.push("Vendedor Comercial");
-    hiddenColumns.push("Vendedor comercial");
-    hiddenColumns.push("Consultor");
-
     const columns = getListColumns(displayRows).filter(column => {
         const originalKey = column;
         const visualLabel = getColumnLabel(column);
@@ -1132,10 +1172,10 @@ function getRowsByDrilldownType(type) {
     const prospectRows = (currentProspectFilteredData || []).filter(Boolean);
 
     // Prospects-related drilldowns should use the registration-based dataset
-    if (type === "prospects") return prospectRows;
-    if (type === "inProgress") return prospectRows.filter(item => STATUS.inProgress.includes(normalize(item?.[COLUMN_MAP.status])));
-    if (type === "lost") return prospectRows.filter(item => STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status])));
-    if (type === "noViability") return prospectRows.filter(item => STATUS.noViability.includes(normalize(item?.[COLUMN_MAP.status])));
+    if (type === "prospects") return currentDashboardMetrics?.prospects || prospectRows;
+    if (["inProgress", "lost", "noViability"].includes(type)) {
+        return currentDashboardMetrics?.prospectStatusRows[type] || [];
+    }
     if (type === "inactive") {
         return salesRows.filter(isInactiveContract);
     }
@@ -1149,41 +1189,61 @@ function getRowsByDrilldownType(type) {
     }
 
     // Sales/activation-related drilldowns use the sales/activation dataset
-    if (type === "won") return getUniqueWonRows(salesRows);
-    if (type === "installationPaid") return getUniqueWonRows(salesRows).filter(item => !isFreeInstallation(item));
-    if (type === "installationFree") return getUniqueWonRows(salesRows).filter(item => isFreeInstallation(item));
+    if (type === "won") return currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows);
+    if (type === "installationPaid") return (currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows)).filter(item => !isFreeInstallation(item));
+    if (type === "installationFree") return (currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows)).filter(item => isFreeInstallation(item));
     if (type === "taxPaid") return salesRows.filter(item => parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0);
 
     return [];
 }
 
 function getWinDedupKey(item) {
-    const candidates = [
+    const invalidIdentifiers = new Set([
+        "", "-", "--", "undefined", "null", "n/a", "na", "sim", "yes",
+        "não", "nao", "true", "false", "ativo", "active", "inativo",
+        "contrato", "vencemos", "cancelado", "cancelada", "desistiu",
+        "pré-contrato", "pre-contrato"
+    ]);
+    const normalizeIdentifier = value => {
+        const identifier = normalize(String(value ?? "")).replace(/\s+/g, " ");
+        return invalidIdentifiers.has(identifier) ? "" : identifier;
+    };
+    const contractIdentifier = [
+        item?.[COLUMN_MAP.idContrato],
+        item?.[COLUMN_MAP.contrato],
+        item?.Contrato
+    ].map(normalizeIdentifier).find(Boolean);
+
+    if (contractIdentifier) return `contrato:${contractIdentifier}`;
+
+    const prospectIdentifier = [
         item?.[COLUMN_MAP.id],
         item?.["ID Prospect"],
         item?.["ID do prospect"],
-        item?.[COLUMN_MAP.contrato],
-        item?.["Contrato Gerado"],
-        item?.Contrato,
         item?.["Razão"],
         item?.Razao,
         item?.["Nome do cliente"],
         item?.Cliente,
-        item?.[COLUMN_MAP.vendedor]
-    ]
+        item?.[COLUMN_MAP.telefone],
+        item?.Telefone,
+        item?.Celular
+    ].map(normalizeIdentifier).find(Boolean) || "";
+    const activationDate = extractActivationDate(item)?.getTime() || "";
+    const plan = normalizeIdentifier(item?.[COLUMN_MAP.plano]);
+    const value = parseFlexibleNumber(item?.[COLUMN_MAP.valorContrato]);
 
-    const firstTruthy = candidates
-        .map(value => normalize(String(value || "")))
-        .find(value => value && value !== "undefined" && value !== "null")
-
-    if (firstTruthy) return firstTruthy
+    if (prospectIdentifier && (activationDate || plan || value)) {
+        return `prospect:${prospectIdentifier}|data:${activationDate}|plano:${plan}|valor:${value}`;
+    }
 
     return JSON.stringify({
+        prospectIdentifier,
+        activationDate,
+        plan,
+        value,
         status: item?.[COLUMN_MAP.status],
-        contrato: item?.[COLUMN_MAP.contrato],
-        valor: item?.[COLUMN_MAP.valorContrato],
-        vendedor: getSellerValue(item)
-    })
+        statusContrato: item?.[COLUMN_MAP.statusContrato]
+    });
 }
 
 function getUniqueWonRows(rows) {
@@ -1229,7 +1289,7 @@ function isFreeInstallation(item) {
 function getListColumns(rows) {
     if (!rows.length) {
         return [
-            COLUMN_MAP.status, COLUMN_MAP.vendedor, COLUMN_MAP.plano,
+            COLUMN_MAP.status, COLUMN_MAP.vendedorProspect, COLUMN_MAP.vendedorContrato, COLUMN_MAP.plano,
             COLUMN_MAP.canal, COLUMN_MAP.campanha, COLUMN_MAP.data
         ];
     }

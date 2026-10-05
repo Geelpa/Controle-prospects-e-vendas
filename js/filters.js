@@ -1,8 +1,7 @@
 function populateFilters(data) {
-
-    populateSellerFilter(data)
     populateMonthFilter(data)
     populateYearFilter(data)
+    populateSellerFilter(data)
 }
 
 function matchesGlobalSearch(item, query) {
@@ -14,84 +13,62 @@ function matchesGlobalSearch(item, query) {
     )
 }
 
-function populateSellerFilter(data) {
-
+function populateSellerFilter(data, selectedMonth, selectedYear, preserveSelection = false) {
     const select = document.getElementById("sellerFilter")
-
     if (!select) return
 
-    const hasSellerActivity = (item) => {
-        const responsibleSeller = getField(item, COLUMN_MAP.vendedor, [
-            "Vendedor",
-            "Vendedor Prospect",
-            "Vendedor prospect",
-            "Vendedor do prospect",
-            "Vendedor Comercial",
-            "Vendedor comercial",
-            "Vendedor responsável",
-            "Responsável",
-            "Responsavel",
-            "Vendor",
-            "Consultor"
-        ])
-
-        const rawSeller = getSellerValue(item) || responsibleSeller
-
-        if (!rawSeller) return false
-
-        const sellerValue = String(rawSeller).trim()
-        if (!sellerValue || sellerValue === "undefined" || sellerValue === "null") return false
-
-        const hasKnownSellerId = !/^\d+$/.test(sellerValue) || !!resolveSellerDisplayName(sellerValue)
-        if (!hasKnownSellerId) return false
-
-        const status = normalize(item?.[COLUMN_MAP.status])
-        const hasStatusMatch = status && (
-            STATUS.won.includes(status) ||
-            STATUS.lost.includes(status) ||
-            STATUS.noViability.includes(status) ||
-            STATUS.inProgress.includes(status)
-        )
-
-        const contractStatus = String(item?.[COLUMN_MAP.statusContrato] || "").trim()
-        const hasContract = contractStatus !== "" && contractStatus !== "-"
-
-        const hasRevenue = parseCurrencyNumber(item?.[COLUMN_MAP.valorContrato] || item?.["Valor contrato"] || item?.["Valor do contrato"] || 0) > 0
-        const isLeoProspect = ["não", "nao"].includes(
-            normalize(item?.[COLUMN_MAP.prospeccao])
-        )
-
-        return hasStatusMatch || hasContract || hasRevenue || isLeoProspect
-    }
-
+    const previousSelection = preserveSelection ? select.value : "all"
+    const month = selectedMonth ?? document.getElementById("monthFilter")?.value ?? "all"
+    const year = selectedYear ?? document.getElementById("yearFilter")?.value ?? "all"
     select.innerHTML = '<option value="all">Todos</option>'
 
-    const uniqueSellers = new Map()
+    const salesBySeller = new Map()
+    const wonRows = getUniqueWonRows((data || []).filter(isWon))
 
-    data.forEach(item => {
-        if (!hasSellerActivity(item)) return
+    wonRows.forEach(item => {
+        const activationDate = extractActivationDate(item)
+        if (month !== "all" && (!activationDate || activationDate.getMonth() + 1 !== Number(month))) return
+        if (year !== "all" && (!activationDate || activationDate.getFullYear() !== Number(year))) return
 
-        const rawValue = String(getSellerValue(item)).trim()
-        const sellerLabel = resolveSellerDisplayName(rawValue) || rawValue
-
-        if (/^\d+$/.test(rawValue) && sellerLabel === rawValue) return
+        const rawSeller = getContractSellerValue(item) || getSellerValue(item)
+        const sellerLabel = resolveSellerDisplayName(rawSeller) || rawSeller
+        if (!sellerLabel) return
 
         const sellerKey = normalize(sellerLabel)
-        if (!sellerKey) return
-
-        if (!uniqueSellers.has(sellerKey)) {
-            uniqueSellers.set(sellerKey, sellerLabel)
-        }
+        const existing = salesBySeller.get(sellerKey)
+        salesBySeller.set(sellerKey, {
+            label: existing?.label || sellerLabel,
+            count: (existing?.count || 0) + 1
+        })
     })
 
-    Array.from(uniqueSellers.values())
-        .sort((a, b) => a.localeCompare(b, "pt-BR"))
-        .forEach(sellerLabel => {
+    ;(data || []).forEach(item => {
+        const rawSeller = getProspectSellerValue(item)
+        const sellerLabel = resolveSellerDisplayName(rawSeller) || rawSeller
+        if (!sellerLabel) return
+
+        const registrationDate = extractRegistrationDate(item)
+        if (month !== "all" && (!registrationDate || registrationDate.getMonth() + 1 !== Number(month))) return
+        if (year !== "all" && (!registrationDate || registrationDate.getFullYear() !== Number(year))) return
+
+        const sellerKey = normalize(sellerLabel)
+        if (!sellerKey || salesBySeller.has(sellerKey)) return
+
+        salesBySeller.set(sellerKey, { label: sellerLabel, count: 0 })
+    })
+
+    Array.from(salesBySeller.values())
+        .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label, "pt-BR"))
+        .forEach(({ label }) => {
             const option = document.createElement("option")
-            option.value = sellerLabel
-            option.textContent = sellerLabel
+            option.value = label
+            option.textContent = label
             select.appendChild(option)
         })
+
+    select.value = Array.from(select.options).some(option => option.value === previousSelection)
+        ? previousSelection
+        : "all"
 }
 
 function populateMonthFilter(data) {
@@ -195,17 +172,13 @@ function populateYearFilter(data) {
 }
 
 function applyFilters() {
-
-
-
-    const seller =
-        document.getElementById("sellerFilter").value
-
     const month =
         document.getElementById("monthFilter").value
 
     const year =
         document.getElementById("yearFilter").value
+    populateSellerFilter(rawData, month, year, true)
+    const seller = document.getElementById("sellerFilter").value
     const globalSearch =
         document.getElementById("globalSearch")?.value || ""
     // Build two filtered datasets:
@@ -217,7 +190,7 @@ function applyFilters() {
         // seller match
         const sellerMatch =
             seller === "all" ||
-            normalize(resolveSellerDisplayName(getSellerValue(item))) === normalize(String(seller))
+            normalize(resolveSellerDisplayName(getProspectSellerValue(item) || getField(item, COLUMN_MAP.vendedor))) === normalize(String(seller))
 
         if (!sellerMatch) return false
 
@@ -270,35 +243,18 @@ function updateSalesChartFilters(data, selectedMonth) {
     const viewFilter = document.getElementById("salesViewFilter")
     const weekFilter = document.getElementById("weekFilter")
     const title = document.getElementById("salesChartTitle")
-    const monthOption = viewFilter?.querySelector('option[value="month"]')
-    const weekOption = viewFilter?.querySelector('option[value="week"]')
-
     if (!viewFilter || !weekFilter) return
 
-    if (selectedMonth === "all") {
-        viewFilter.value = "month"
-        viewFilter.disabled = true
-        if (monthOption) monthOption.disabled = false
-        if (weekOption) weekOption.disabled = true
+    viewFilter.disabled = false
+
+    if (viewFilter.value === "month") {
         weekFilter.classList.add("hidden")
-        weekFilter.value = "all"
         if (title) title.textContent = "Resultados por Mês"
         return
     }
 
-    if (monthOption) monthOption.disabled = true
-    if (weekOption) weekOption.disabled = false
-
-    // Ao sair da visão anual, começa por dia; depois preserva a escolha dia/semana.
-    if (viewFilter.value === "month") {
-        viewFilter.value = "day"
-    }
-
-    viewFilter.disabled = false
-
     if (viewFilter.value === "week") {
         weekFilter.classList.add("hidden")
-        weekFilter.value = "all"
         if (title) title.textContent = "Resultados por Semana"
         return
     }
@@ -323,12 +279,9 @@ function populateWeekFilter(data) {
     const weekStarts = new Set()
 
     data.forEach(item => {
-        const status = normalize(item[COLUMN_MAP.status])
-        const parsedDate = STATUS.won.includes(status)
+        const parsedDate = isWon(item)
             ? extractActivationDate(item)
-            : isLossStatus(item)
-                ? extractRegistrationDate(item)
-                : null
+            : extractRegistrationDate(item)
 
         if (parsedDate) weekStarts.add(formatDateKey(getWeekStart(parsedDate)))
     })
@@ -354,6 +307,8 @@ function populateWeekFilter(data) {
 
     if ([...weekFilter.options].some(option => option.value === currentValue)) {
         weekFilter.value = currentValue
+    } else {
+        weekFilter.value = "all"
     }
 }
 

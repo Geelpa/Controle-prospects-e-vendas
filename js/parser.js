@@ -1,4 +1,5 @@
 let uploadedCsvFiles = []
+let financialMergeConflicts = []
 const SHORTCUT_STORAGE_KEY = "dashboardComercial.shortcuts"
 let editingShortcutId = ""
 
@@ -98,11 +99,24 @@ function mergeFieldValue(currentValue, incomingValue, key) {
     if (!currentText) return incomingText
     if (!incomingText) return currentText
 
+    if (normalizeCsvText(key).toLowerCase() === normalizeCsvText(COLUMN_MAP.vendedorContrato).toLowerCase()) {
+        return ["-", "--", "undefined", "null"].includes(incomingText.toLowerCase())
+            ? currentText
+            : incomingText
+    }
+
     const currentNumeric = parseCurrencyLike(currentValue)
     const incomingNumeric = parseCurrencyLike(incomingValue)
 
     if (key.toLowerCase().includes("valor") || key.toLowerCase().includes("taxa") || key.toLowerCase().includes("preco")) {
-        return incomingNumeric > currentNumeric ? incomingText : currentText
+        if (currentNumeric > 0 && incomingNumeric > 0 && currentNumeric !== incomingNumeric) {
+            const conflict = { field: key, kept: currentText, alternate: incomingText }
+            const conflictKey = JSON.stringify(conflict)
+            if (!financialMergeConflicts.some(item => JSON.stringify(item) === conflictKey)) {
+                financialMergeConflicts.push(conflict)
+            }
+        }
+        return currentNumeric > 0 ? currentText : incomingNumeric > 0 ? incomingText : currentText
     }
 
     if (key === "Status" || key.toLowerCase().includes("status")) {
@@ -151,34 +165,73 @@ function mergeRowData(existingRow, incomingRow) {
     return merged
 }
 
-function getRowIdentity(row) {
-    const identityCandidates = [
+function getClientId(row) {
+    const invalidValues = new Set(["", "-", "--", "undefined", "null"])
+    return [
+        row?.["ID cliente"], row?.["ID do cliente"], row?.[COLUMN_MAP.id]
+    ].map(value => normalizeCsvText(value).toLowerCase())
+        .find(value => !invalidValues.has(value)) || ""
+}
+
+function getProspectId(row) {
+    const invalidValues = new Set(["", "-", "--", "undefined", "null"])
+    return [row?.[COLUMN_MAP.idProspect], row?.["ID do prospect"]]
+        .map(value => normalizeCsvText(value).toLowerCase())
+        .find(value => !invalidValues.has(value)) || ""
+}
+
+function getValidContractKey(value) {
+    const invalidIdentifiers = new Set([
+        "", "-", "--", "undefined", "null", "n/a", "na", "sim", "yes",
+        "não", "nao", "true", "false", "ativo", "active", "inativo",
+        "contrato", "vencemos", "cancelado", "cancelada", "desistiu",
+        "pré-contrato", "pre-contrato"
+    ])
+    const contractKey = normalizeContractKey(value)
+    return invalidIdentifiers.has(contractKey) ? "" : contractKey
+}
+
+function hasReceivedValueField(row) {
+    return normalizeCsvText(row?.[COLUMN_MAP.valorRecebido]) !== ""
+}
+
+function hasReceivedAmount(row) {
+    return hasReceivedValueField(row) && parseCurrencyLike(row?.[COLUMN_MAP.valorRecebido]) !== 0
+}
+
+function getContractIdentity(row) {
+    const contractId = [
         row?.[COLUMN_MAP.idContrato],
-        row?.ID,
-        row?.["ID Prospect"],
-        row?.["ID do prospect"],
-        row?.["Contrato Gerado"],
-        row?.Contrato,
-        row?.["Telefone celular"],
-        row?.Telefone,
-        row?.Celular,
-        row?.["Razão"],
-        row?.Razao,
-        row?.["Nome do cliente"],
-        row?.Cliente
-    ]
+        row?.[COLUMN_MAP.contrato],
+        row?.Contrato
+    ].map(getValidContractKey).find(Boolean)
 
-    const normalized = identityCandidates
-        .map(value => normalizeCsvText(value))
-        .filter(Boolean)
-        .map(value => value.toLowerCase())
+    return contractId || ""
+}
 
-    if (!normalized.length) return "__row_without_identity__"
+function getRowIdentity(row) {
+    const contractIdentity = getContractIdentity(row)
+    if (contractIdentity) return `contract:${contractIdentity}`
 
-    const priority = normalized.find(value => value && /^[0-9]+$/.test(value.replace(/[^0-9]/g, "")))
-    if (priority) return `id:${priority}`
+    const prospectId = getProspectId(row)
+    if (prospectId) return `prospect:${prospectId}`
 
-    return `razao:${normalized[0]}`
+    const clientId = getClientId(row)
+    if (clientId && inferSheetRole(row) !== "contract") return `client:${clientId}`
+
+    if (clientId) {
+        const activationDate = normalizeCsvText(row?.[COLUMN_MAP.dataAtivacao])
+        const plan = normalizeCsvText(row?.[COLUMN_MAP.plano]).toLowerCase()
+        const value = parseCurrencyLike(row?.[COLUMN_MAP.valorContrato])
+        return `activation:${clientId}|${activationDate}|${plan}|${value}`
+    }
+
+    const fallback = [
+        row?.["Telefone celular"], row?.Telefone, row?.Celular,
+        row?.["Razão"], row?.Razao, row?.["Nome do cliente"], row?.Cliente
+    ].map(value => normalizeCsvText(value).toLowerCase()).find(Boolean)
+
+    return fallback ? `fallback:${fallback}` : "__row_without_identity__"
 }
 
 function normalizeContractKey(value) {
@@ -192,16 +245,12 @@ function getContractKeys(row) {
     return Array.from(new Set([
         row?.[COLUMN_MAP.idContrato],
         row?.[COLUMN_MAP.contrato],
-        row?.Contrato,
-        row?.ID
-    ].map(normalizeContractKey).filter(Boolean)))
+        row?.Contrato
+    ].map(getValidContractKey).filter(Boolean)))
 }
 
 function isReceivedPaymentRow(row) {
-    return Boolean(
-        normalizeCsvText(row?.[COLUMN_MAP.idContrato]) &&
-        normalizeCsvText(row?.[COLUMN_MAP.valorRecebido])
-    )
+    return hasReceivedValueField(row) && getContractKeys(row).length > 0
 }
 
 function buildReceivedByContract(rows) {
@@ -211,7 +260,7 @@ function buildReceivedByContract(rows) {
         const amount = parseCurrencyLike(row[COLUMN_MAP.valorRecebido])
         if (!amount) return
 
-        const contractKey = normalizeContractKey(row?.[COLUMN_MAP.idContrato]) || getContractKeys(row)[0]
+        const contractKey = getContractKeys(row)[0]
         if (!contractKey) return
 
         receivedByContract.set(contractKey, (receivedByContract.get(contractKey) || 0) + amount)
@@ -220,11 +269,40 @@ function buildReceivedByContract(rows) {
     return receivedByContract
 }
 
+function buildReceivedAudit(rows, operationalRows, receivedByContract) {
+    const rowsWithAmount = (rows || []).filter(row =>
+        normalizeCsvText(row?.[COLUMN_MAP.valorRecebido]) !== ""
+    )
+    const validPaymentRows = rowsWithAmount.filter(row => parseCurrencyLike(row[COLUMN_MAP.valorRecebido]) !== 0)
+    const operationalContractKeys = new Set(
+        (operationalRows || []).flatMap(getContractKeys)
+    )
+    const paymentContractKeys = new Set(
+        validPaymentRows.flatMap(getContractKeys)
+    )
+    const unmatchedContractKeys = Array.from(paymentContractKeys)
+        .filter(key => !operationalContractKeys.has(key))
+
+    return {
+        rowsWithAmount: rowsWithAmount.length,
+        invalidOrZeroAmounts: rowsWithAmount.length - validPaymentRows.length,
+        validPaymentRows: validPaymentRows.length,
+        missingContractId: validPaymentRows.filter(row => getContractKeys(row).length === 0).length,
+        contractRowsWithoutReceivedValue: (rows || []).filter(row =>
+            inferSheetRole(row) === "contract" && !hasReceivedValueField(row)
+        ).length,
+        contractsWithPayments: receivedByContract.size,
+        unmatchedContracts: unmatchedContractKeys.length,
+        unmatchedContractIds: unmatchedContractKeys,
+        totalReceived: Array.from(receivedByContract.values()).reduce((sum, amount) => sum + amount, 0)
+    }
+}
+
 function buildContractDetailsByContract(rows) {
     const detailsByContract = new Map()
 
-    rows.filter(isReceivedPaymentRow).forEach(row => {
-        const contractKey = normalizeContractKey(row?.[COLUMN_MAP.idContrato]) || getContractKeys(row)[0]
+    rows.filter(row => getContractIdentity(row)).forEach(row => {
+        const contractKey = getContractIdentity(row)
         if (!contractKey) return
 
         const existing = detailsByContract.get(contractKey)
@@ -248,7 +326,7 @@ function attachContractData(rows, contractDetailsByContract) {
     })
 
     contractDetailsByContract.forEach((detail, contractKey) => {
-        if (!matchedContracts.has(contractKey)) enrichedRows.push(detail)
+        if (!matchedContracts.has(contractKey) && isReceivedPaymentRow(detail)) enrichedRows.push(detail)
     })
 
     return enrichedRows
@@ -335,6 +413,7 @@ function mergeCsvRows(rows) {
         mergedRows: mergedMap.size,
         duplicatesMerged: duplicateCount.total,
         duplicateGroups: Object.fromEntries(Array.from(duplicateGroups.entries())),
+        financialConflicts: financialMergeConflicts,
         detectedByRole: byRole
     }
 
@@ -343,6 +422,65 @@ function mergeCsvRows(rows) {
     }
 
     return Array.from(mergedMap.values())
+}
+
+function attachClientDataById(rows) {
+    const clientDataById = new Map()
+    const activationsByClientId = new Map()
+    const customerFields = [
+        COLUMN_MAP.id,
+        COLUMN_MAP.razao,
+        COLUMN_MAP.telefone,
+        COLUMN_MAP.vendedorProspect,
+        COLUMN_MAP.vendedor,
+        COLUMN_MAP.prospeccao,
+        COLUMN_MAP.status,
+        COLUMN_MAP.data,
+        COLUMN_MAP.canal,
+        COLUMN_MAP.campanha,
+        COLUMN_MAP.cep,
+        COLUMN_MAP.latitudeProspect,
+        COLUMN_MAP.longitudeProspect,
+        COLUMN_MAP.motivoPerda
+    ]
+
+    rows.forEach(row => {
+        const clientId = getClientId(row)
+        if (!clientId) return
+
+        if (inferSheetRole(row) === "contract") {
+            activationsByClientId.set(clientId, (activationsByClientId.get(clientId) || 0) + 1)
+            return
+        }
+
+        const existing = clientDataById.get(clientId)
+        clientDataById.set(clientId, existing ? mergeRowData(existing, row) : { ...row })
+    })
+
+    return rows
+        .map(row => {
+            const clientId = getClientId(row)
+            if (!clientId || inferSheetRole(row) !== "contract") return row
+
+            const clientData = clientDataById.get(clientId)
+            if (!clientData) return row
+
+            const enriched = { ...row }
+            customerFields.forEach(field => {
+                if (!normalizeCsvText(enriched[field]) && normalizeCsvText(clientData[field])) {
+                    enriched[field] = clientData[field]
+                }
+            })
+            return enriched
+        })
+        .filter(row => {
+            const clientId = getClientId(row)
+            return !(
+                clientId &&
+                inferSheetRole(row) !== "contract" &&
+                activationsByClientId.has(clientId)
+            )
+        })
 }
 
 function findMatchingHeader(row, candidates) {
@@ -373,6 +511,8 @@ function normalizeRowHeaders(row = {}) {
     const normalized = { ...row }
 
     const fieldMap = [
+        [COLUMN_MAP.id, ["ID", "Id", "id", "ID cliente", "ID do cliente"]],
+        [COLUMN_MAP.idProspect, ["ID Prospect", "ID do prospect"]],
         [COLUMN_MAP.razao, ["Razão", "Razao", "Razão social", "Razao social", "Razão social/nome", "Razao social/nome"]],
         [COLUMN_MAP.statusContrato, ["Status contrato", "Status do contrato", "Status Contrato"]],
         [COLUMN_MAP.latitudeProspect, ["Latitude Prospect", "Latitude do prospect"]],
@@ -393,8 +533,8 @@ function normalizeRowHeaders(row = {}) {
         [COLUMN_MAP.data, ["Data do cadastro", "Data cadastro", "Data do Cadastro", "Data de cadastro"]],
         [COLUMN_MAP.dataAtivacao, ["Data ativação", "Data de ativação", "Data ativacao", "Data de ativacao", "Data Ativação", "Data Ativacao"]],
         [COLUMN_MAP.contrato, ["Contrato Gerado", "Contrato", "Contrato gerado"]],
-        [COLUMN_MAP.idContrato, ["ID contrato", "ID Contrato", "Id contrato", "Contrato ID"]],
-        [COLUMN_MAP.valorContrato, ["Valor contrato", "Valor do plano", "Valor do contrato", "Valor"]],
+        [COLUMN_MAP.idContrato, ["ID contrato", "ID do contrato", "ID Contrato", "Id contrato", "Contrato ID", "Número do contrato", "Numero do contrato", "Nº do contrato", "N° do contrato"]],
+        [COLUMN_MAP.valorContrato, ["Valor contrato", "Valor do plano", "Valor plano", "Valor do contrato", "Preço do plano", "Preco do plano", "Valor"]],
         [COLUMN_MAP.valorRecebido, ["Valor recebido", "Valor Recebido", "Valor recebido total", "Recebido"]],
         [COLUMN_MAP.taxaAtivacao, ["Taxa de ativação", "Taxa de ativacao", "Taxa de ativacao ", "Taxa ativação"]],
         [COLUMN_MAP.descricaoCancelamento, ["Descrição do cancelamento", "Descricao do cancelamento"]],
@@ -404,7 +544,14 @@ function normalizeRowHeaders(row = {}) {
     ]
 
     fieldMap.forEach(([targetKey, aliases]) => {
-        const match = findMatchingHeader(normalized, aliases)
+        const match = targetKey === COLUMN_MAP.vendedor ||
+            targetKey === COLUMN_MAP.id ||
+            targetKey === COLUMN_MAP.contrato ||
+            targetKey === COLUMN_MAP.valorContrato
+            ? Object.keys(normalized).find(key =>
+                aliases.some(alias => normalizeCsvText(key).toLowerCase() === normalizeCsvText(alias).toLowerCase())
+            )
+            : findMatchingHeader(normalized, aliases)
         if (!match) return
         normalized[targetKey] = normalized[match]
     })
@@ -424,43 +571,13 @@ function parseCsvFile(file) {
                             .some(value => String(value || "").trim() !== "")
                     )
                     .map(normalizeRowHeaders)
-                resolve(rows.map(applyLeoProspectSeller))
+                resolve(rows)
             },
             error: function (error) {
                 reject(error)
             }
         })
     })
-}
-
-function applyLeoProspectSeller(row) {
-    const prospectFlag = normalizeCsvText(row?.[COLUMN_MAP.prospeccao]).toLowerCase()
-    const isProspectWithoutSeller =
-        prospectFlag === "não" || prospectFlag === "nao"
-    const isOwnershipTransfer = [
-        row?.[COLUMN_MAP.canal],
-        row?.[COLUMN_MAP.canalOrigem],
-        row?.[COLUMN_MAP.campanha]
-    ].some(value => normalizeCsvText(value).toLowerCase() === "troca de titularidade")
-
-    if (!isProspectWithoutSeller || isOwnershipTransfer) return row
-
-    const sellerValues = [
-        row?.[COLUMN_MAP.vendedorProspect],
-        row?.[COLUMN_MAP.vendedor]
-    ]
-    const hasSeller = sellerValues.some(value => {
-        const text = normalizeCsvText(value).toLowerCase()
-        return text && text !== "-" && text !== "--" && text !== "undefined" && text !== "null"
-    })
-
-    if (hasSeller) return row
-
-    return {
-        ...row,
-        [COLUMN_MAP.vendedorProspect]: "Léo",
-        [COLUMN_MAP.vendedor]: "Léo"
-    }
 }
 
 function getSavedShortcuts() {
@@ -643,6 +760,8 @@ async function processCsvFiles(newlySelectedFiles, replaceUploadedFiles = false)
 
     if (!newlySelectedFiles.length) return
 
+    financialMergeConflicts = []
+
     const uniqueFiles = Array.from(
         new Map(
             [...baseFiles, ...newlySelectedFiles]
@@ -656,11 +775,21 @@ async function processCsvFiles(newlySelectedFiles, replaceUploadedFiles = false)
     const parsedRows = parsedFiles.flat()
     const receivedByContract = buildReceivedByContract(parsedRows)
     const contractDetailsByContract = buildContractDetailsByContract(parsedRows)
-    const operationalRows = parsedRows.filter(row => !isReceivedPaymentRow(row))
+    const operationalRows = parsedRows.filter(row => !hasReceivedValueField(row))
+    const receivedAudit = buildReceivedAudit(parsedRows, operationalRows, receivedByContract)
     const mergedRows = mergeCsvRows(operationalRows)
-    const enrichedRows = attachContractData(mergedRows, contractDetailsByContract)
-    rawData = attachReceivedValues(enrichedRows, receivedByContract).map(applyBusinessRules)
+    const clientLinkedRows = attachClientDataById(mergedRows)
+    const enrichedRows = attachContractData(clientLinkedRows, contractDetailsByContract)
+    const rowsWithReceived = attachReceivedValues(enrichedRows, receivedByContract)
+    receivedAudit.rowsWithPositiveReceivedAttached = rowsWithReceived.filter(row =>
+        parseCurrencyLike(row?.[COLUMN_MAP.valorRecebido]) > 0
+    ).length
+    receivedAudit.totalAttachedToRows = rowsWithReceived.reduce((total, row) =>
+        total + Math.max(0, parseCurrencyLike(row?.[COLUMN_MAP.valorRecebido])), 0
+    )
+    rawData = rowsWithReceived.map(applyBusinessRules)
     window.receivedByContract = Object.fromEntries(receivedByContract.entries())
+    window.receivedAudit = receivedAudit
 
     populateFilters(rawData)
     showDashboard()
