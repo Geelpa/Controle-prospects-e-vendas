@@ -149,10 +149,15 @@ function processData(prospectData, salesData) {
         createSalesPerDayChart(resultChartRows, prospectsData, currentDashboardMetrics);
     }
 
-    // Gráficos de funil e comparação de status continuam na base completa filtrada (vendas/ativação).
-    if (typeof createChannelsChart === "function") createChannelsChart(salesData || []);
-    if (typeof createCampaignsChart === "function") createCampaignsChart(salesData || []);
-    if (typeof createLossReasonsChart === "function") createLossReasonsChart(salesData || []);
+    // Gráficos de comparação de status também precisam dos prospects sem contrato,
+    // pois perdas e registros sem viabilidade não entram na base de vendas/ativação.
+    const statusChartRows = [
+        ...(salesData || []),
+        ...prospectsData
+    ];
+    if (typeof createChannelsChart === "function") createChannelsChart(statusChartRows);
+    if (typeof createCampaignsChart === "function") createCampaignsChart(statusChartRows);
+    if (typeof createLossReasonsChart === "function") createLossReasonsChart(statusChartRows);
 }
 
 document.querySelectorAll("[data-page-tab]").forEach(button => {

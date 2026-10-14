@@ -13,6 +13,11 @@ function matchesGlobalSearch(item, query) {
     )
 }
 
+function getProspectSellerDisplayName(item) {
+    const seller = getProspectSellerValue(item) || getSellerValue(item)
+    return resolveSellerDisplayName(seller) || seller
+}
+
 function populateSellerFilter(data, selectedMonth, selectedYear, preserveSelection = false) {
     const select = document.getElementById("sellerFilter")
     if (!select) return
@@ -43,8 +48,7 @@ function populateSellerFilter(data, selectedMonth, selectedYear, preserveSelecti
     })
 
     ;(data || []).forEach(item => {
-        const rawSeller = getProspectSellerValue(item)
-        const sellerLabel = resolveSellerDisplayName(rawSeller) || rawSeller
+        const sellerLabel = getProspectSellerDisplayName(item)
         if (!sellerLabel) return
 
         const registrationDate = extractRegistrationDate(item)
@@ -190,7 +194,7 @@ function applyFilters() {
         // seller match
         const sellerMatch =
             seller === "all" ||
-            normalize(resolveSellerDisplayName(getProspectSellerValue(item) || getField(item, COLUMN_MAP.vendedor))) === normalize(String(seller))
+            normalize(getProspectSellerDisplayName(item)) === normalize(String(seller))
 
         if (!sellerMatch) return false
 
