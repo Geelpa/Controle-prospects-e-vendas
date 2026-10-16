@@ -48,14 +48,49 @@
         }
 
         .page-tab {
-            border-color: transparent !important;
-            border-bottom: 2px solid transparent !important;
-            border-radius: 0.375rem 0.375rem 0 0 !important;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 6rem;
+            padding: 0.55rem 1rem !important;
+            border: 1px solid #765640 !important;
+            border-radius: 0.6rem !important;
+            background: rgba(75, 53, 40, 0.62) !important;
+            color: #d6ad87 !important;
+            transition: border-color 140ms ease, background-color 140ms ease, color 140ms ease, transform 140ms ease;
+        }
+
+        .page-tab:hover,
+        .page-tab:focus-visible {
+            border-color: #d69b5f !important;
+            background: #5a3d2d !important;
+            color: #fff4e5 !important;
+            transform: translateY(-1px);
         }
 
         .page-tab.is-active {
-            border-color: #6b4f3f !important;
-            border-bottom-color: #75b798 !important;
+            border-color: #d69b5f !important;
+            background: linear-gradient(135deg, #9a6037, #6b452e) !important;
+            color: #fff8ed !important;
+            box-shadow: 0 4px 14px rgba(20, 12, 8, 0.22), inset 0 1px rgba(255, 244, 229, 0.12);
+        }
+
+        .goal-copy-button {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.4rem 0.65rem !important;
+            border-color: rgba(214, 155, 95, 0.45) !important;
+            background: rgba(35, 24, 18, 0.4) !important;
+            color: #f3e2cc !important;
+            font-size: 0.72rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .goal-copy-button:hover {
+            border-color: #e2a463 !important;
+            background: rgba(135, 98, 71, 0.42) !important;
             color: #fff4e5 !important;
         }
 
@@ -561,13 +596,13 @@
 
 <body class="bg-[#3b2a1f] min-h-screen p-2 text-[#f3e2cc] font-['Inter',system-ui,sans-serif] antialiased">
 
-    <div class="max-w-[1600px] mx-auto p-4">
+    <div class="mx-auto max-w-[1600px] p-3 sm:p-4">
 
         <!-- HEADER -->
-        <div class="flex items-center justify-between mb-4">
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 
-            <div class="flex flex-wrap items-center gap-5">
-                <h1 class="text-3xl font-semibold text-[#f3e2cc]">
+            <div class="flex flex-wrap items-center gap-3 sm:gap-5">
+                <h1 class="text-2xl font-semibold text-[#f3e2cc] sm:text-3xl">
                     Dashboard Comercial
                 </h1>
                 <nav class="flex items-center gap-1" role="tablist" aria-label="Seções do dashboard">
@@ -579,9 +614,9 @@
             </div>
 
             <!-- Upload -->
-            <div class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg px-4 py-3 shadow-sm flex flex-wrap items-center justify-end gap-2">
+            <div class="flex w-full max-w-full gap-2 rounded-lg border border-[#6b4f3f] bg-[#4b3528] px-3 py-2 shadow-sm sm:w-auto sm:justify-end sm:px-4 sm:py-3">
 
-                <input type="file" id="csvFile" accept=".csv" multiple class="text-sm text-[#f3e2cc]" />
+                <input type="file" id="csvFile" accept=".csv" multiple class="w-full max-w-full text-sm text-[#f3e2cc] sm:w-auto" />
 
                 <select id="savedShortcutSelect" aria-label="Selecionar atalho de dados" class="text-sm">
                     <option value="">Atalhos salvos</option>
@@ -767,6 +802,7 @@
                     <h2 id="totalProspects" class="text-3xl font-semibold mt-2">
                         0
                     </h2>
+                    <p id="prospectsDailyAverage" class="text-xs font-medium mt-1 text-[#c9a98d]">-- por dia</p>
 
                 </div>
 
@@ -806,6 +842,7 @@
                     <h2 id="wonDeals" class="text-3xl font-semibold mt-2 text-[#e5c9ac]">
                         0
                     </h2>
+                    <p id="activationsDailyAverage" class="text-xs font-medium mt-1 text-[#c9a98d]">-- por dia</p>
 
                 </div>
 
@@ -897,9 +934,10 @@
                         Planos Mais Vendidos
                     </h3>
 
-                    <div class="h-[320px]">
+                    <div id="plansChartContainer" class="h-[320px]">
                         <canvas id="plansChart"></canvas>
                     </div>
+                    <button id="plansChartShowMore" type="button" class="hidden mt-3 text-xs font-semibold" aria-controls="plansChartContainer" aria-expanded="false">Ver mais</button>
                 </div>
 
                 <!-- VENDEDORES -->
@@ -908,9 +946,10 @@
                         Ranking de Vendedores
                     </h3>
 
-                    <div class="h-[320px]">
+                    <div id="sellersChartContainer" class="h-[320px]">
                         <canvas id="sellersChart"></canvas>
                     </div>
+                    <button id="sellersChartShowMore" type="button" class="hidden mt-3 text-xs font-semibold" aria-controls="sellersChartContainer" aria-expanded="false">Ver mais</button>
                 </div>
 
                 <!-- CANAIS -->
@@ -920,9 +959,10 @@
                         Canais de Venda
                     </h3>
 
-                    <div class="h-[320px]">
+                    <div id="channelsChartContainer" class="h-[320px]">
                         <canvas id="channelsChart"></canvas>
                     </div>
+                    <button id="channelsChartShowMore" type="button" class="hidden mt-3 text-xs font-semibold" aria-controls="channelsChartContainer" aria-expanded="false">Ver mais</button>
 
                 </div>
 
@@ -933,9 +973,10 @@
                         Campanhas
                     </h3>
 
-                    <div class="h-[320px]">
+                    <div id="campaignsChartContainer" class="h-[320px]">
                         <canvas id="campaignsChart"></canvas>
                     </div>
+                    <button id="campaignsChartShowMore" type="button" class="hidden mt-3 text-xs font-semibold" aria-controls="campaignsChartContainer" aria-expanded="false">Ver mais</button>
 
                 </div>
 
@@ -946,9 +987,10 @@
                         Motivos de Perda
                     </h3>
 
-                    <div class="h-[320px]">
+                    <div id="lossReasonsChartContainer" class="h-[320px]">
                         <canvas id="lossReasonsChart"></canvas>
                     </div>
+                    <button id="lossReasonsChartShowMore" type="button" class="hidden mt-3 text-xs font-semibold" aria-controls="lossReasonsChartContainer" aria-expanded="false">Ver mais</button>
 
                 </div>
 
@@ -1002,75 +1044,136 @@
     </div>
 
     <section id="goalContent" class="hidden" role="tabpanel" aria-labelledby="goalTab" aria-label="Meta mensal">
-        <div class="max-w-4xl border-t border-[#876247] pt-6">
-            <p class="text-xs font-semibold uppercase tracking-wide text-[#e2a463]">Planejamento comercial</p>
-            <h2 id="goalMonthTitle" class="mt-2 text-2xl font-semibold text-[#fff4e5]">Meta do próximo mês</h2>
-            <p class="mt-2 max-w-2xl text-sm text-[#d6ad87]">
-                Compare a meta do mês com o histórico real para entender o nível de execução e o piso mínimo de leads e ativações.
-            </p>
-
-            <div class="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div class="rounded-xl border-l-4 border-[#75b798] bg-[#4b3528] px-5 py-4 shadow-sm shadow-[#1f160f]/30">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#c8d9cc]">Ativações</p>
-                    <div class="mt-3 grid grid-cols-2 gap-3">
-                        <div class="rounded-lg border border-[#75b798]/30 bg-[#2d3f34] p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8d9cc]">Fixa</p>
-                            <p id="activationFixedTarget" class="mt-2 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        </div>
-                        <div class="rounded-lg border border-[#d6ad87]/30 bg-[#4b3528] p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#e5c9ac]">Dinâmica</p>
-                            <p id="activationDynamicTarget" class="mt-2 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        </div>
-                    </div>
-                    <p id="activationDynamicFormula" class="mt-3 text-sm text-[#d6ad87]">Calculando...</p>
-                    <p id="activationDynamicPeriods" class="mt-2 text-xs text-[#c9a98d]">Base: -- · Ref.: --</p>
+        <div class="mx-auto w-full max-w-7xl border-t border-[#876247] px-1 pt-5 sm:px-2">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#e2a463]">Planejamento comercial</p>
+                    <h2 id="goalMonthTitle" class="mt-1 text-2xl font-semibold text-[#fff4e5]">Meta do mês vigente</h2>
+                    <p class="mt-1 max-w-3xl text-xs leading-5 text-[#d6ad87]">
+                        Acompanhe realizado, conversão dos leads cadastrados no mês selecionado e projeção até o fim do período.
+                    </p>
                 </div>
-                <div class="rounded-xl border-l-4 border-[#d6ad87] bg-[#4b3528] px-5 py-4 shadow-sm shadow-[#1f160f]/30">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#e5c9ac]">Leads / prospects</p>
-                    <div class="mt-3 grid grid-cols-2 gap-3">
-                        <div class="rounded-lg border border-[#75b798]/30 bg-[#2d3f34] p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8d9cc]">Fixa</p>
-                            <p id="leadFixedTarget" class="mt-2 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        </div>
-                        <div class="rounded-lg border border-[#d6ad87]/30 bg-[#4b3528] p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#e5c9ac]">Dinâmica</p>
-                            <p id="goalDynamicTarget" class="mt-2 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        </div>
-                    </div>
-                    <p id="goalDynamicFormula" class="mt-3 text-sm text-[#d6ad87]">Calculando...</p>
-                    <p id="goalDynamicPeriods" class="mt-2 text-xs text-[#c9a98d]">Base: -- · Ref.: --</p>
-                </div>
+                <span class="rounded-full border border-[#876247] bg-[#4b3528] px-3 py-1.5 text-[0.68rem] font-medium text-[#e5c9ac]">
+                    Mês e ano definidos pelos filtros do painel
+                </span>
             </div>
 
-            <div class="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div class="rounded-xl border border-[#6b4f3f] bg-[#36271f] p-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#d6ad87]">Leads por mês</p>
-                    <div class="mt-3 rounded-lg border border-[#d6ad87]/20 bg-[#4b3528] p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c9a98d]">Meta mínima</p>
-                        <p id="leadAverageTarget" class="mt-1 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        <p id="leadAverageMeta" class="mt-1 text-xs text-[#d6ad87]">0 dias úteis × 11/dia</p>
+            <div class="mt-5 grid gap-5 xl:grid-cols-2">
+                <section aria-labelledby="leadsGoalHeading" class="overflow-hidden rounded-xl border border-[#8a6147] bg-gradient-to-br from-[#493225] to-[#38271e] shadow-md shadow-[#1f160f]/25">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#8a6147]/60 px-5 py-4">
+                        <div>
+                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-[#e2a463]">01 · Aquisição</p>
+                            <h3 id="leadsGoalHeading" class="mt-0.5 text-lg font-semibold text-[#fff4e5]">Leads / prospects</h3>
+                        </div>
+                        <button id="copyLeadGoal" type="button" class="goal-copy-button" aria-label="Copiar resumo da meta de leads e prospects">
+                            <span aria-hidden="true">▣</span> Copiar resumo
+                        </button>
                     </div>
-                    <div class="mt-3 rounded-lg border border-[#75b798]/30 bg-[#2a3b2f] p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8d9cc]">Média histórica</p>
-                        <p id="leadAverageActual" class="mt-1 text-xl font-semibold text-[#c8d9cc]">0</p>
+                    <div class="space-y-4 p-5">
+                        <div class="rounded-lg border border-[#d6ad87]/35 bg-[#2f211a]/65 p-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Realizado</p>
+                                    <p id="leadMonthActual" class="mt-1 text-2xl font-bold tracking-tight text-[#fff4e5]">--</p>
+                                    <p class="text-[0.68rem] text-[#c9a98d]">leads cadastrados</p>
+                                </div>
+                                <div class="border-l border-[#765640] pl-3">
+                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Necessário para a meta</p>
+                                    <p id="leadMonthlyTarget" class="mt-1 text-2xl font-bold tracking-tight text-[#fff4e5]">--</p>
+                                    <p class="text-[0.68rem] text-[#c9a98d]">para alcançar 240 ativações</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#211812]" role="progressbar" aria-label="Progresso da meta de leads" aria-valuemin="0" aria-valuemax="100">
+                                <div id="leadGoalProgress" class="h-full rounded-full bg-[#d69b5f] transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="leadRemainingTarget" class="mt-1.5 text-[0.68rem] text-[#c9a98d]">Leads restantes: --</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <div class="rounded-lg border border-[#d6ad87]/20 bg-[#4b3528]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Projeção</p>
+                                <p id="leadEstimatedTarget" class="mt-1 text-lg font-semibold text-[#fff4e5]">--</p>
+                                <p class="text-[0.62rem] text-[#c9a98d]">leads no mês</p>
+                            </div>
+                            <div class="rounded-lg border border-[#d6ad87]/20 bg-[#4b3528]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Conversão</p>
+                                <p id="goalConversion" class="mt-1 text-lg font-semibold text-[#fff4e5]">--</p>
+                                <p id="goalConversionDetail" class="text-[0.62rem] leading-4 text-[#c9a98d]">Dados da safra do mês</p>
+                            </div>
+                            <div class="rounded-lg border border-[#d6ad87]/20 bg-[#4b3528]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Média diária</p>
+                                <p id="leadDailyAverage" class="mt-1 text-lg font-semibold text-[#fff4e5]">--</p>
+                                <p class="text-[0.62rem] text-[#c9a98d]">leads / dia</p>
+                            </div>
+                            <div class="rounded-lg border border-[#d6ad87]/20 bg-[#4b3528]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Meta fixa</p>
+                                <p class="mt-1 text-lg font-semibold text-[#fff4e5]">240</p>
+                                <p class="text-[0.62rem] text-[#c9a98d]">ativações</p>
+                            </div>
+                        </div>
+                        <p id="leadGoalFormula" class="text-[0.68rem] leading-5 text-[#d6ad87]">Calculando...</p>
+                        <p id="leadGoalCopyStatus" class="min-h-4 text-[0.68rem] text-[#e2a463]" role="status" aria-live="polite"></p>
                     </div>
-                </div>
+                </section>
 
-                <div class="rounded-xl border border-[#6b4f3f] bg-[#36271f] p-4">
-                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-[#d6ad87]">Ativações por mês</p>
-                    <div class="mt-3 rounded-lg border border-[#d6ad87]/20 bg-[#4b3528] p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c9a98d]">Meta mínima</p>
-                        <p id="activationAverageTarget" class="mt-1 text-2xl font-semibold text-[#fff4e5]">0</p>
-                        <p id="activationAverageMeta" class="mt-1 text-xs text-[#d6ad87]">0 dias úteis × 11/dia</p>
+                <section aria-labelledby="activationsGoalHeading" class="overflow-hidden rounded-xl border border-[#5e8e73] bg-gradient-to-br from-[#304238] to-[#26342c] shadow-md shadow-[#1f160f]/25">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-[#75b798]/30 px-5 py-4">
+                        <div>
+                            <p class="text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-[#a9d1b8]">02 · Conversão</p>
+                            <h3 id="activationsGoalHeading" class="mt-0.5 text-lg font-semibold text-[#f2fff5]">Ativações</h3>
+                        </div>
+                        <button id="copyActivationGoal" type="button" class="goal-copy-button" aria-label="Copiar resumo da meta de ativações">
+                            <span aria-hidden="true">▣</span> Copiar resumo
+                        </button>
                     </div>
-                    <div class="mt-3 rounded-lg border border-[#75b798]/30 bg-[#2a3b2f] p-3">
-                        <p class="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#c8d9cc]">Média histórica</p>
-                        <p id="activationAverageActual" class="mt-1 text-xl font-semibold text-[#c8d9cc]">0</p>
+                    <div class="space-y-4 p-5">
+                        <div class="rounded-lg border border-[#75b798]/35 bg-[#1e2d24]/65 p-4">
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Realizado</p>
+                                    <p id="activationMonthActual" class="mt-1 text-2xl font-bold tracking-tight text-[#f2fff5]">--</p>
+                                    <p class="text-[0.68rem] text-[#a9c6b2]">ativações no mês</p>
+                                </div>
+                                <div class="border-l border-[#557562] pl-3">
+                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Meta esperada</p>
+                                    <p id="activationMonthlyTarget" class="mt-1 text-2xl font-bold tracking-tight text-[#f2fff5]">--</p>
+                                    <p class="text-[0.68rem] text-[#a9c6b2]">ativações</p>
+                                </div>
+                            </div>
+                            <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#17221b]" role="progressbar" aria-label="Progresso da meta de ativações" aria-valuemin="0" aria-valuemax="100">
+                                <div id="activationGoalProgress" class="h-full rounded-full bg-[#75b798] transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="activationRemainingTarget" class="mt-1.5 text-[0.68rem] text-[#a9c6b2]">Restantes para a meta: --</p>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            <div class="rounded-lg border border-[#75b798]/20 bg-[#304238]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Estimativa</p>
+                                <p id="activationEstimatedTarget" class="mt-1 text-lg font-semibold text-[#f2fff5]">--</p>
+                                <p class="text-[0.62rem] text-[#a9c6b2]">ativações no mês</p>
+                            </div>
+                            <div class="rounded-lg border border-[#75b798]/20 bg-[#304238]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Média diária</p>
+                                <p id="activationDailyAverage" class="mt-1 text-lg font-semibold text-[#f2fff5]">--</p>
+                                <p class="text-[0.62rem] text-[#a9c6b2]">ativações / dia</p>
+                            </div>
+                            <div class="rounded-lg border border-[#75b798]/20 bg-[#304238]/55 p-3">
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Conversão</p>
+                                <p id="activationConversionSummary" class="mt-1 text-lg font-semibold text-[#f2fff5]">--</p>
+                                <p class="text-[0.62rem] text-[#a9c6b2]">safra do mês</p>
+                            </div>
+                        </div>
+                        <p id="activationGoalFormula" class="text-[0.68rem] leading-5 text-[#a9c6b2]">Calculando...</p>
+                        <p id="activationGoalCopyStatus" class="min-h-4 text-[0.68rem] text-[#a9d1b8]" role="status" aria-live="polite"></p>
                     </div>
-                </div>
+                </section>
             </div>
 
-            <p id="goalStatus" class="mt-4 text-sm text-[#d6ad87]" role="status">A meta dinâmica usa o último mês completo e aplica um piso mínimo de 11 prospects por dia útil. A média histórica mostra a execução real do período analisado.</p>
+            <div class="mt-6">
+                <div class="rounded-xl border border-[#6b4f3f] bg-[#36271f] p-4">
+                    <p class="text-xs font-semibold uppercase tracking-[0.15em] text-[#d6ad87]">Resumo do mês selecionado</p>
+                    <p id="goalHistoryPeriod" class="mt-2 text-sm leading-6 text-[#e5c9ac]">Histórico: --</p>
+                </div>
+            </div>
+            <p id="goalStatus" class="mt-4 text-sm text-[#d6ad87]" role="status">Carregue uma base para calcular as metas e as médias diárias.</p>
         </div>
     </section>
 

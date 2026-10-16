@@ -1,3 +1,63 @@
+function getFilteredDailyAverage(rows, getDate) {
+    const dates = rows
+        .map(getDate)
+        .filter(date => date instanceof Date && !Number.isNaN(date.getTime()))
+        .map(date => new Date(date.getFullYear(), date.getMonth(), date.getDate()))
+    const uniqueMonths = new Set(dates.map(date =>
+        `${date.getFullYear()}-${date.getMonth()}`
+    ))
+    const currentDate = new Date()
+    currentDate.setHours(0, 0, 0, 0)
+    const selectedMonth = document.getElementById("monthFilter")?.value || "all"
+    const selectedYear = document.getElementById("yearFilter")?.value || "all"
+    let elapsedDays = 0
+
+    if (selectedMonth !== "all" && selectedYear !== "all") {
+        const year = Number(selectedYear)
+        const month = Number(selectedMonth) - 1
+        const start = new Date(year, month, 1)
+        if (start <= currentDate) {
+            const monthDays = new Date(year, month + 1, 0).getDate()
+            elapsedDays = year === currentDate.getFullYear() && month === currentDate.getMonth()
+                ? currentDate.getDate()
+                : monthDays
+        }
+    } else if (selectedMonth !== "all") {
+        uniqueMonths.forEach(monthKey => {
+            const [year, month] = monthKey.split("-").map(Number)
+            const start = new Date(year, month, 1)
+            if (start > currentDate) return
+            const monthDays = new Date(year, month + 1, 0).getDate()
+            elapsedDays += year === currentDate.getFullYear() && month === currentDate.getMonth()
+                ? currentDate.getDate()
+                : monthDays
+        })
+    } else if (selectedYear !== "all") {
+        const year = Number(selectedYear)
+        const start = new Date(year, 0, 1)
+        if (start <= currentDate) {
+            elapsedDays = year === currentDate.getFullYear()
+                ? Math.floor((currentDate - start) / 86400000) + 1
+                : (new Date(year + 1, 0, 1) - start) / 86400000
+        }
+    } else if (dates.length) {
+        const firstDate = dates.reduce((earliest, date) =>
+            date < earliest ? date : earliest
+        )
+        const latestDate = dates.reduce((latest, date) =>
+            date > latest ? date : latest
+        )
+        const lastDate = latestDate > currentDate ? currentDate : latestDate
+        elapsedDays = lastDate >= firstDate
+            ? Math.floor((lastDate - firstDate) / 86400000) + 1
+            : 0
+    }
+
+    return elapsedDays > 0 ? dates.length / elapsedDays : null
+}
+
+let latestGoalSummary = null
+
 function processData(prospectData, salesData) {
     // 1. FUNÇÃO AUXILIAR: Converte valores da planilha tratando formatos
     const parseNumber = (value) => {
@@ -19,6 +79,14 @@ function processData(prospectData, salesData) {
     // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
     const wonRows = currentDashboardMetrics.wonRows;
     const won = wonRows.length;
+    const prospectsDailyAverage = getFilteredDailyAverage(
+        prospectsData,
+        extractRegistrationDate
+    );
+    const activationsDailyAverage = getFilteredDailyAverage(
+        wonRows,
+        extractActivationDate
+    );
     const conversionWonRows = wonRows.filter(item =>
         !isAdditionalPlan(item, COLUMN_MAP) &&
         !isOwnershipTransferChannel(item)
@@ -97,6 +165,8 @@ function processData(prospectData, salesData) {
     // --- BLOCO DE ATUALIZAÇÃO DOS CARDS NA TELA ---
     updateKPIs({
         total: totalProspects,
+        prospectsDailyAverage,
+        activationsDailyAverage,
         won,
         lost,
         noViability,
@@ -123,6 +193,7 @@ function processData(prospectData, salesData) {
         if (sellerFromContract && String(sellerFromContract).trim() !== "" && normalize(sellerFromContract) !== "undefined") {
             return resolveSellerDisplayName(sellerFromContract) || sellerFromContract;
         }
+
         return resolveSellerDisplayName(getSellerValue(item)) || getSellerValue(item);
     };
 
@@ -173,17 +244,78 @@ document.querySelectorAll("[data-page-tab]").forEach(button => {
         })
     })
 })
+
+async function writeGoalSummaryToClipboard(text) {
+    let clipboardError = null
+    if (navigator.clipboard?.writeText) {
+        try {
+            await navigator.clipboard.writeText(text)
+            return
+        } catch (error) {
+            clipboardError = error
+        }
+    }
+
+    const textarea = document.createElement("textarea")
+    textarea.value = text
+    textarea.setAttribute("readonly", "")
+    textarea.style.position = "fixed"
+    textarea.style.opacity = "0"
+    document.body.appendChild(textarea)
+    textarea.select()
+    const copied = typeof document.execCommand === "function" &&
+        document.execCommand("copy")
+    textarea.remove()
+
+    if (!copied) {
+        throw clipboardError || new Error("O navegador não permitiu copiar o resumo.")
+    }
+}
+
+async function copyGoalSummary(section) {
+    const statusId = section === "leads"
+        ? "leadGoalCopyStatus"
+        : "activationGoalCopyStatus"
+    const status = document.getElementById(statusId)
+    const summary = latestGoalSummary?.[section]
+    if (!summary) {
+        if (status) status.textContent = "Carregue os dados para gerar o resumo."
+        return
+    }
+
+    try {
+        await writeGoalSummaryToClipboard(summary)
+        if (status) status.textContent = "Resumo copiado."
+    } catch (error) {
+        console.error("Não foi possível copiar o resumo da meta.", error)
+        if (status) status.textContent = "Não foi possível copiar. Verifique a permissão do navegador."
+    }
+}
+
+document.getElementById("copyLeadGoal")?.addEventListener("click", () =>
+    copyGoalSummary("leads")
+)
+document.getElementById("copyActivationGoal")?.addEventListener("click", () =>
+    copyGoalSummary("activations")
+)
+
 updateMonthlyGoal()
 
 function updateMonthlyGoal() {
     const title = document.getElementById("goalMonthTitle")
     if (!title) return
 
-    const targetDate = new Date()
-    targetDate.setDate(1)
-    targetDate.setMonth(targetDate.getMonth() + 1)
+    const currentDate = new Date()
+    const selectedMonth = document.getElementById("monthFilter")?.value || "all"
+    const selectedYear = document.getElementById("yearFilter")?.value || "all"
+    const targetMonth = selectedMonth === "all"
+        ? currentDate.getMonth() + 1
+        : Number(selectedMonth)
+    const targetYear = selectedYear === "all"
+        ? currentDate.getFullYear()
+        : Number(selectedYear)
+    const targetDate = new Date(targetYear, targetMonth - 1, 1)
 
-    const formatCount = value => Math.ceil(value || 0).toLocaleString("pt-BR")
     const formatMonth = date => new Intl.DateTimeFormat("pt-BR", {
         month: "long",
         year: "numeric"
@@ -195,167 +327,180 @@ function updateMonthlyGoal() {
         const element = document.getElementById(id)
         if (element) element.textContent = value
     }
+    const formatCount = value => Math.ceil(value || 0).toLocaleString("pt-BR")
+    const formatDailyAverage = value => value.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    })
+    const monthlyActivationGoal = 240
 
     const selectedSeller = normalize(document.getElementById("sellerFilter")?.value || "all")
     const query = document.getElementById("globalSearch")?.value || ""
-    const matchesLeadFilters = item => {
+    const matchesGoalFilters = (item, preferContractSeller = false) => {
         if (query && !matchesGlobalSearch(item, query)) return false
         if (selectedSeller === "all") return true
 
-        const seller = getProspectSellerValue(item) || getSellerValue(item)
+        const seller = preferContractSeller
+            ? getContractSellerValue(item) || getSellerValue(item)
+            : getProspectSellerValue(item) || getSellerValue(item)
         return normalize(resolveSellerDisplayName(seller)) === selectedSeller
     }
 
-    const seenProspects = new Set()
-    const prospectRows = (rawData || []).filter(item => {
-        if (!isNewProspect(item, COLUMN_MAP) || !matchesLeadFilters(item)) return false
-
+    const targetMonthStart = new Date(targetDate.getFullYear(), targetDate.getMonth(), 1)
+    const targetMonthEnd = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0)
+    const targetMonthDays = targetMonthEnd.getDate()
+    const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
+    const isTargetMonthCurrent = targetDate.getTime() === currentMonthStart.getTime()
+    const isTargetMonthFuture = targetMonthStart > currentMonthStart
+    const observedThroughDate = isTargetMonthFuture
+        ? new Date(targetMonthStart.getFullYear(), targetMonthStart.getMonth(), 0)
+        : isTargetMonthCurrent
+            ? currentDate
+            : targetMonthEnd
+    const getProspectKey = item => {
         const prospectId = typeof getProspectId === "function" ? getProspectId(item) : ""
-        if (!prospectId) return true
-        if (seenProspects.has(prospectId)) return false
-        seenProspects.add(prospectId)
-        return true
-    })
+        return prospectId ? `prospect:${prospectId}` : ""
+    }
 
-    const monthlyLeadCounts = new Map()
+    const uniqueLeads = new Map()
+    const prospectRows = (rawData || []).filter(item =>
+        isNewProspect(item, COLUMN_MAP) && matchesGoalFilters(item)
+    )
     prospectRows.forEach(item => {
         const date = extractRegistrationDate(item)
-        if (!date) return
+        if (!date || date > observedThroughDate) return
 
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-        monthlyLeadCounts.set(key, (monthlyLeadCounts.get(key) || 0) + 1)
-    })
-
-    const fixedTarget = document.getElementById("goalFixedTarget")
-    const fixedFormula = document.getElementById("goalFixedFormula")
-    const dailyTarget = 11
-    let businessDays = 0
-    const daysInTargetMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0).getDate()
-    for (let day = 1; day <= daysInTargetMonth; day++) {
-        const weekday = new Date(targetDate.getFullYear(), targetDate.getMonth(), day).getDay()
-        if (weekday !== 0 && weekday !== 6) businessDays++
-    }
-
-    const monthlyLeadAverage = Array.from(monthlyLeadCounts.values()).reduce((sum, count) => sum + count, 0) / Math.max(monthlyLeadCounts.size, 1)
-    const activationMonthlyCounts = new Map()
-    const activationRows = getUniqueWonRows((rawData || []).filter(item => {
-        if (!isWon(item)) return false
-        if (query && !matchesGlobalSearch(item, query)) return false
-        if (selectedSeller !== "all") {
-            const seller = getContractSellerValue(item) || getSellerValue(item)
-            return normalize(resolveSellerDisplayName(seller)) === selectedSeller
+        const key = getProspectKey(item)
+        if (!key || !uniqueLeads.has(key)) {
+            uniqueLeads.set(key || Symbol(), { item, date })
         }
-        return true
-    }))
-    activationRows.forEach(item => {
-        const date = extractActivationDate(item)
-        if (!date) return
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-        activationMonthlyCounts.set(key, (activationMonthlyCounts.get(key) || 0) + 1)
     })
-    const monthlyActivationAverage = Array.from(activationMonthlyCounts.values()).reduce((sum, count) => sum + count, 0) / Math.max(activationMonthlyCounts.size, 1)
+    const monthLeads = Array.from(uniqueLeads.values()).filter(({ date }) =>
+        date >= targetMonthStart && date <= observedThroughDate
+    )
 
-    const fixedMinimumMonthlyGoal = businessDays * dailyTarget
-    const activationDynamicInfo = (() => {
-        if (!activationMonthlyCounts.size) return { target: fixedMinimumMonthlyGoal, formula: `${businessDays} dias úteis × ${formatCount(dailyTarget)} por dia` }
+    const monthActivationRows = getUniqueWonRows((rawData || []).filter(item =>
+        matchesGoalFilters(item, true)
+    )).map(item => ({ item, date: extractActivationDate(item) }))
+        .filter(entry => entry.date &&
+            entry.date >= targetMonthStart &&
+            entry.date <= observedThroughDate)
 
-        const getMonthKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-        const currentMonthDate = new Date(targetDate.getFullYear(), targetDate.getMonth() - 1, 1)
-        const lastCompletedMonthDate = new Date(targetDate.getFullYear(), targetDate.getMonth() - 2, 1)
-        const referenceDate = new Date(lastCompletedMonthDate.getFullYear(), lastCompletedMonthDate.getMonth() - 12, 1)
-        const resolvedReferenceDate = (() => {
-            const referenceKey = getMonthKey(referenceDate)
-            if (activationMonthlyCounts.has(referenceKey)) return referenceDate
-            const availableDates = Array.from(activationMonthlyCounts.keys())
-                .map(key => {
-                    const [year, month] = key.split("-").map(Number)
-                    return new Date(year, month - 1, 1)
-                })
-                .sort((a, b) => a - b)
-            const oldestPastDate = availableDates.filter(date => date <= referenceDate)[0]
-            return oldestPastDate || availableDates[0] || referenceDate
-        })()
-        const completedMonthActivations = activationMonthlyCounts.get(getMonthKey(lastCompletedMonthDate)) || 0
-        const referenceMonthActivations = activationMonthlyCounts.get(getMonthKey(resolvedReferenceDate)) || 0
-        const historicalActivationGoal = Math.max(0, Math.ceil(completedMonthActivations - referenceMonthActivations * 0.1))
-        const target = Math.max(fixedMinimumMonthlyGoal, historicalActivationGoal)
-        const formula = historicalActivationGoal >= fixedMinimumMonthlyGoal
-            ? `${formatCount(completedMonthActivations)} ativações − 10% de ${formatCount(referenceMonthActivations)} = ${formatCount(target)}`
-            : `${businessDays} dias úteis × ${formatCount(dailyTarget)} por dia = ${formatCount(target)}`
-        return { target, formula }
-    })()
+    const acquisitionRows = monthLeads
+        .map(entry => entry.item)
+        .filter(item => !isOwnershipTransferChannel(item))
+    const conversionWins = getUniqueWonRows(acquisitionRows).length
+    const conversionLosses = acquisitionRows.filter(item =>
+        STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status]))
+    ).length
+    const completedOpportunities = conversionWins + conversionLosses
+    const conversionRate = completedOpportunities > 0
+        ? conversionWins / completedOpportunities
+        : 0
+    const elapsedMonthDays = isTargetMonthFuture
+        ? 0
+        : isTargetMonthCurrent
+            ? Math.min(currentDate.getDate(), targetMonthDays)
+            : targetMonthDays
+    const leadDailyAverage = elapsedMonthDays > 0
+        ? monthLeads.length / elapsedMonthDays
+        : null
+    const activationDailyAverage = elapsedMonthDays > 0
+        ? monthActivationRows.length / elapsedMonthDays
+        : null
+    const projectedLeadCount = elapsedMonthDays > 0
+        ? isTargetMonthCurrent
+            ? monthLeads.length / elapsedMonthDays * targetMonthDays
+            : monthLeads.length
+        : null
+    const leadTarget = conversionRate > 0
+        ? Math.ceil(monthlyActivationGoal / conversionRate)
+        : null
+    const estimatedActivations = leadTarget === null || projectedLeadCount === null
+        ? null
+        : projectedLeadCount * conversionRate
+    const remainingLeads = leadTarget === null
+        ? null
+        : Math.max(0, leadTarget - monthLeads.length)
+    const remainingActivations = Math.max(0, monthlyActivationGoal - monthActivationRows.length)
+    const leadProgress = leadTarget
+        ? Math.min(100, monthLeads.length / leadTarget * 100)
+        : 0
+    const activationProgress = Math.min(100, monthActivationRows.length / monthlyActivationGoal * 100)
+    const formatPercent = (value, target) => target > 0
+        ? `${(value / target * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
+        : "--"
 
-    if (fixedTarget) fixedTarget.textContent = formatCount(fixedMinimumMonthlyGoal)
-    if (fixedFormula) fixedFormula.textContent = `${businessDays} dias úteis × ${formatCount(dailyTarget)} por dia`
-    setText("goalBusinessDays", `Dias úteis: ${businessDays} (sem descontar feriados)`)
-    setText("leadAverageTarget", formatCount(fixedMinimumMonthlyGoal))
-    setText("leadAverageActual", formatCount(monthlyLeadAverage))
-    setText("leadAverageMeta", `${businessDays} dias úteis × ${formatCount(dailyTarget)}/dia`)
-    setText("activationAverageTarget", formatCount(fixedMinimumMonthlyGoal))
-    setText("activationAverageActual", formatCount(monthlyActivationAverage))
-    setText("activationAverageMeta", `${businessDays} dias úteis × ${formatCount(dailyTarget)}/dia`)
-    setText("activationFixedTarget", formatCount(fixedMinimumMonthlyGoal))
-    setText("activationDynamicTarget", formatCount(activationDynamicInfo.target))
-    setText("activationDynamicFormula", activationDynamicInfo.formula)
-    setText("activationDynamicPeriods", `Base: ${formatMonth(new Date(targetDate.getFullYear(), targetDate.getMonth() - 2, 1))} · Ref.: ${formatMonth(new Date(targetDate.getFullYear(), targetDate.getMonth() - 14, 1))}`)
-
-    const dynamicTarget = document.getElementById("goalDynamicTarget")
-    const dynamicFormula = document.getElementById("goalDynamicFormula")
-    const dynamicPeriods = document.getElementById("goalDynamicPeriods")
-    const status = document.getElementById("goalStatus")
-
-    if (!monthlyLeadCounts.size) {
-        if (dynamicTarget) dynamicTarget.textContent = "Sem histórico"
-        if (dynamicFormula) dynamicFormula.textContent = "A meta dinâmica será exibida quando houver leads com data de cadastro."
-        if (dynamicPeriods) dynamicPeriods.textContent = "Mês-base: -- · Referência: --"
-        if (status) status.textContent = "A meta fixa de Vencemos já está calculada; carregue uma base para calcular a meta de leads."
-        setText("leadFixedTarget", "--")
-        setText("leadDynamicTarget", "--")
-        setText("leadDynamicFormula", "Sem histórico")
-        setText("activationFixedTarget", "--")
-        setText("activationDynamicTarget", "--")
-        setText("activationDynamicFormula", "Sem histórico")
-        return
+    const leadProgressBar = document.getElementById("leadGoalProgress")
+    if (leadProgressBar) {
+        leadProgressBar.style.width = `${leadProgress}%`
+        leadProgressBar.parentElement?.setAttribute("aria-valuenow", String(Math.round(leadProgress)))
+    }
+    const activationProgressBar = document.getElementById("activationGoalProgress")
+    if (activationProgressBar) {
+        activationProgressBar.style.width = `${activationProgress}%`
+        activationProgressBar.parentElement?.setAttribute("aria-valuenow", String(Math.round(activationProgress)))
     }
 
-    const getMonthKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`
-    const lastCompletedMonthDate = new Date(targetDate.getFullYear(), targetDate.getMonth() - 2, 1)
-    const referenceDate = new Date(lastCompletedMonthDate.getFullYear(), lastCompletedMonthDate.getMonth() - 12, 1)
-    const resolvedReferenceDate = (() => {
-        const referenceKey = getMonthKey(referenceDate)
-        if (monthlyLeadCounts.has(referenceKey)) return referenceDate
+    setText("activationMonthlyTarget", formatCount(monthlyActivationGoal))
+    setText("activationMonthActual", formatCount(monthActivationRows.length))
+    setText("activationRemainingTarget", `${formatCount(remainingActivations)} ativações restantes para a meta`)
+    setText("activationDailyAverage", activationDailyAverage === null
+        ? "--"
+        : `${formatDailyAverage(activationDailyAverage)} por dia`)
+    setText("activationEstimatedTarget", estimatedActivations === null
+        ? "--"
+        : Math.round(estimatedActivations).toLocaleString("pt-BR"))
+    setText("activationConversionSummary", conversionRate > 0
+        ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
+        : "--")
+    setText("activationGoalFormula", leadTarget === null
+        ? "Sem conversões concluídas neste mês para calcular a projeção."
+        : projectedLeadCount === null
+            ? `Projeção indisponível para o mês futuro. Conversão do mês: ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%.`
+            : `${formatDailyAverage(projectedLeadCount / targetMonthDays)} leads/dia projetam ${formatCount(projectedLeadCount)} leads no mês; × ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${Math.round(estimatedActivations).toLocaleString("pt-BR")} ativações estimadas.`)
+    setText("leadMonthlyTarget", leadTarget === null ? "--" : formatCount(leadTarget))
+    setText("leadMonthActual", formatCount(monthLeads.length))
+    setText("leadRemainingTarget", remainingLeads === null
+        ? "Leads restantes: indisponível sem conversão do mês"
+        : `${formatCount(remainingLeads)} leads restantes para a meta`)
+    setText("leadDailyAverage", leadDailyAverage === null
+        ? "--"
+        : `${formatDailyAverage(leadDailyAverage)} por dia`)
+    setText("leadEstimatedTarget", projectedLeadCount === null
+        ? "--"
+        : formatCount(projectedLeadCount))
+    setText("leadGoalFormula", leadTarget === null
+        ? `Sem oportunidades concluídas no mês de ${targetLabel}; a meta de ${formatCount(monthlyActivationGoal)} ativações não pode ser convertida em quantidade de leads.`
+        : `${formatCount(monthlyActivationGoal)} ativações ÷ ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão deste mês = ${formatCount(leadTarget)} leads no total.`)
+    setText("goalConversion", conversionRate > 0
+        ? `${(conversionRate * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+        : "--")
+    setText("goalConversionDetail", completedOpportunities > 0
+        ? `${conversionWins} ativações ÷ ${completedOpportunities} oportunidades concluídas entre os leads cadastrados em ${formatMonth(targetDate)}`
+        : `Sem oportunidades concluídas entre os leads cadastrados em ${formatMonth(targetDate)}`)
+    setText("goalHistoryPeriod", isTargetMonthFuture
+        ? `Mês selecionado: ${targetLabel} · O período ainda não começou.`
+        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão calculada apenas com leads concluídos neste mês.`)
+    setText("goalStatus", leadTarget === null
+        ? `Meta fixa: ${formatCount(monthlyActivationGoal)} ativações. A conversão será calculada quando houver oportunidades concluídas no mês selecionado.`
+        : `Projeção e conversão calculadas com os dados de ${targetLabel}; o realizado e os leads restantes refletem o andamento do próprio mês.`)
 
-        const availableDates = Array.from(monthlyLeadCounts.keys())
-            .map(key => {
-                const [year, month] = key.split("-").map(Number)
-                return new Date(year, month - 1, 1)
-            })
-            .sort((a, b) => a - b)
-
-        const oldestPastDate = availableDates.filter(date => date <= referenceDate)[0]
-        return oldestPastDate || availableDates[0] || referenceDate
-    })()
-    const completedMonthLeads = monthlyLeadCounts.get(getMonthKey(lastCompletedMonthDate)) || 0
-    const referenceMonthLeads = monthlyLeadCounts.get(getMonthKey(resolvedReferenceDate)) || 0
-    const historicalLeadGoal = Math.max(0, Math.ceil(completedMonthLeads - referenceMonthLeads * 0.1))
-    const minimumLeadGoal = businessDays * dailyTarget
-    const leadGoal = Math.max(minimumLeadGoal, historicalLeadGoal)
-
-    if (dynamicTarget) dynamicTarget.textContent = formatCount(leadGoal)
-    if (dynamicFormula) dynamicFormula.textContent = historicalLeadGoal >= minimumLeadGoal
-        ? `${formatCount(completedMonthLeads)} leads − 10% de ${formatCount(referenceMonthLeads)} leads = ${formatCount(leadGoal)}`
-        : `${businessDays} dias úteis × ${formatCount(dailyTarget)} por dia = ${formatCount(leadGoal)}`
-    if (dynamicPeriods) dynamicPeriods.textContent = `Mês-base (${formatMonth(lastCompletedMonthDate)}): ${formatCount(completedMonthLeads)} · Referência (${formatMonth(resolvedReferenceDate)}): ${formatCount(referenceMonthLeads)}`
-    if (status) status.textContent = `Meta de leads para ${targetLabel}. Usa o último mês completo e aplica um piso de ${formatCount(dailyTarget)} prospects por dia útil.`
-
-    setText("leadFixedTarget", formatCount(minimumLeadGoal))
-    setText("leadDynamicTarget", formatCount(leadGoal))
-    setText("leadDynamicFormula", dynamicFormula.textContent)
-    setText("leadDynamicPeriods", dynamicPeriods.textContent)
-    setText("activationFixedTarget", formatCount(fixedMinimumMonthlyGoal))
-    setText("activationDynamicTarget", formatCount(activationDynamicInfo.target))
-    setText("activationDynamicFormula", activationDynamicInfo.formula)
-    setText("activationDynamicPeriods", `Base: ${formatMonth(new Date(targetDate.getFullYear(), targetDate.getMonth() - 2, 1))} · Ref.: ${formatMonth(new Date(targetDate.getFullYear(), targetDate.getMonth() - 14, 1))}`)
+    latestGoalSummary = {
+        leads: [
+            `Meta de ${targetLabel} — Leads / prospects`,
+            `Realizado: ${formatCount(monthLeads.length)} de ${leadTarget === null ? "meta não calculada" : `${formatCount(leadTarget)} necessários`} (${formatPercent(monthLeads.length, leadTarget)}).`,
+            `Projeção até o fim do mês: ${projectedLeadCount === null ? "indisponível" : formatCount(projectedLeadCount)} leads.`,
+            `Conversão da safra: ${conversionRate > 0 ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "indisponível"}.`
+        ].join("\n"),
+        activations: [
+            `Meta de ${targetLabel} — Ativações`,
+            `Realizado: ${formatCount(monthActivationRows.length)} de ${formatCount(monthlyActivationGoal)} (${formatPercent(monthActivationRows.length, monthlyActivationGoal)}).`,
+            estimatedActivations === null
+                ? "Estimativa até o fim do mês: indisponível sem conversão calculada."
+                : `Estimativa até o fim do mês: ${formatCount(Math.round(estimatedActivations))} ativações.`
+        ].join("\n")
+    }
 }
 
 function buildDashboardMetrics(prospectData, salesData) {

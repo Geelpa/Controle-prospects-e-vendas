@@ -255,11 +255,41 @@ const doughnutValueLabelsPlugin = {
     }
 }
 
+const expandedCharts = {}
+
 function getTopEntries(grouped, limit = 10) {
     return Object.entries(grouped)
         .filter(([label]) => label && normalize(label) !== "undefined")
         .sort((a, b) => b[1] - a[1])
         .slice(0, limit)
+}
+
+function getChartEntriesWithExpansion(chartKey, entries, limit, containerId, onToggle) {
+    const button = document.getElementById(`${chartKey}ChartShowMore`)
+    const container = document.getElementById(containerId)
+    const isExpanded = expandedCharts[chartKey] === true
+
+    if (container) {
+        const chartHeight = isExpanded
+            ? Math.max(320, entries.length * 42 + 90)
+            : 320
+        container.style.height = `${chartHeight}px`
+    }
+
+    if (button) {
+        const hasMore = entries.length > limit
+        button.classList.toggle("hidden", !hasMore)
+        button.textContent = isExpanded
+            ? "Ver menos"
+            : `Ver mais (${Math.max(entries.length - limit, 0)})`
+        button.setAttribute("aria-expanded", String(isExpanded && hasMore))
+        button.onclick = () => {
+            expandedCharts[chartKey] = !expandedCharts[chartKey]
+            onToggle()
+        }
+    }
+
+    return isExpanded ? entries : entries.slice(0, limit)
 }
 
 function wrapLabel(label, maxLength = 24) {
@@ -634,7 +664,7 @@ function isLossStatus(item) {
     return isLostStatus(item) || isNoViabilityStatus(item)
 }
 
-function getSplitStatusEntries(data, columnName, limit = 8) {
+function getSplitStatusEntries(data, columnName) {
     const grouped = {}
 
     data.forEach(item => {
@@ -672,7 +702,6 @@ function getSplitStatusEntries(data, columnName, limit = 8) {
 
     return Object.values(grouped)
         .sort((a, b) => b.total - a.total)
-        .slice(0, limit)
 }
 
 function hasSplitComparisonData(entries) {
@@ -840,15 +869,23 @@ function createChannelsChart(data) {
     // Exclui movimentos de "Troca de Titularidade" dos canais
     const filteredData = uniqueData.filter(item => !isOwnershipTransferChannel(item))
 
-    const entries =
-        getSplitStatusEntries(filteredData, COLUMN_MAP.canal, 8)
+    const allEntries =
+        getSplitStatusEntries(filteredData, COLUMN_MAP.canal)
 
-    if (!hasSplitComparisonData(entries)) {
+    if (!hasSplitComparisonData(allEntries)) {
         toggleChartCard("channelsChartCard", false)
         return
     }
 
     toggleChartCard("channelsChartCard", true)
+
+    const entries = getChartEntriesWithExpansion(
+        "channels",
+        allEntries,
+        8,
+        "channelsChartContainer",
+        () => createChannelsChart(data)
+    )
 
     channelsChart = createSplitStatusBarChart(
         "channelsChart",
@@ -865,15 +902,23 @@ function createCampaignsChart(data) {
     destroyChart(campaignsChart)
 
     const uniqueData = getDeduplicatedChartRows(data)
-    const entries =
-        getSplitStatusEntries(uniqueData, COLUMN_MAP.campanha, 8)
+    const allEntries =
+        getSplitStatusEntries(uniqueData, COLUMN_MAP.campanha)
 
-    if (!hasSplitComparisonData(entries)) {
+    if (!hasSplitComparisonData(allEntries)) {
         toggleChartCard("campaignsChartCard", false)
         return
     }
 
     toggleChartCard("campaignsChartCard", true)
+
+    const entries = getChartEntriesWithExpansion(
+        "campaigns",
+        allEntries,
+        8,
+        "campaignsChartContainer",
+        () => createCampaignsChart(data)
+    )
 
     campaignsChart = createSplitStatusBarChart(
         "campaignsChart",
@@ -896,14 +941,22 @@ function createLossReasonsChart(data) {
         lostOnly,
         COLUMN_MAP.motivoPerda
     )
-    const entries = getTopEntries(grouped, 8)
+    const allEntries = getTopEntries(grouped, Infinity)
 
-    if (!hasComparisonData(entries)) {
+    if (!hasComparisonData(allEntries)) {
         toggleChartCard("lossReasonsChartCard", false)
         return
     }
 
     toggleChartCard("lossReasonsChartCard", true)
+
+    const entries = getChartEntriesWithExpansion(
+        "lossReasons",
+        allEntries,
+        8,
+        "lossReasonsChartContainer",
+        () => createLossReasonsChart(data)
+    )
 
     lossReasonsChart = createHorizontalBarChart(
         "lossReasonsChart",
@@ -1543,14 +1596,22 @@ function createSellersChart(data) {
         wonOnly,
         COLUMN_MAP.vendedor
     )
-    const entries = getTopEntries(grouped, 8)
+    const allEntries = getTopEntries(grouped, Infinity)
 
-    if (!hasComparisonData(entries)) {
+    if (!hasComparisonData(allEntries)) {
         toggleChartCard("sellersChartCard", false)
         return
     }
 
     toggleChartCard("sellersChartCard", true)
+
+    const entries = getChartEntriesWithExpansion(
+        "sellers",
+        allEntries,
+        8,
+        "sellersChartContainer",
+        () => createSellersChart(data)
+    )
 
     sellersChart = createHorizontalBarChart(
         "sellersChart",
@@ -1722,15 +1783,23 @@ function createPlansChart(data) {
         wonWithPlan,
         COLUMN_MAP.plano
     )
-    const entries = getTopEntries(grouped, 10)
+    const allEntries = getTopEntries(grouped, Infinity)
 
-    if (!hasComparisonData(entries)) {
+    if (!hasComparisonData(allEntries)) {
         if (card) {
             card.classList.add("hidden")
         }
 
         return
     }
+
+    const entries = getChartEntriesWithExpansion(
+        "plans",
+        allEntries,
+        10,
+        "plansChartContainer",
+        () => createPlansChart(data)
+    )
 
     plansChart = createHorizontalBarChart(
         "plansChart",

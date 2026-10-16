@@ -1,5 +1,7 @@
 function updateKPIs({
     total,
+    prospectsDailyAverage,
+    activationsDailyAverage,
     won,
     lost,
     noViability,
@@ -17,9 +19,13 @@ function updateKPIs({
 
     document.getElementById("totalProspects").innerText =
         total
+    document.getElementById("prospectsDailyAverage").innerText =
+        formatDailyKpi(prospectsDailyAverage)
 
     document.getElementById("wonDeals").innerText =
         won
+    document.getElementById("activationsDailyAverage").innerText =
+        formatDailyKpi(activationsDailyAverage)
 
     document.getElementById("lostDeals").innerText =
         lost
@@ -46,6 +52,15 @@ function updateKPIs({
 
     document.getElementById("conversionRate").innerText =
         `${conversion}%`
+}
+
+function formatDailyKpi(value) {
+    return value === null || !Number.isFinite(value)
+        ? "Média diária: --"
+        : `Média diária: ${value.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        })} / dia`
 }
 
 function getKpiPercent(value, total) {

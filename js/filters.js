@@ -83,26 +83,7 @@ function populateMonthFilter(data) {
     monthFilter.innerHTML =
         `<option value="all">Todos</option>`
 
-    const months = [
-
-        ...new Set(
-
-            data
-                .map(item => {
-
-                    const parsedDate =
-                        getBusinessDateForRow(item)
-
-                    // IGNORA DATAS INVÁLIDAS
-                    if (!parsedDate) return null
-
-                    return parsedDate.getMonth() + 1
-                })
-
-                .filter(Boolean)
-        )
-
-    ].sort((a, b) => a - b)
+    const months = Array.from({ length: 12 }, (_, index) => index + 1)
 
     months.forEach(month => {
 
@@ -117,13 +98,9 @@ function populateMonthFilter(data) {
         monthFilter.appendChild(option)
     })
 
-    // Seleciona por padrão o mês atual se estiver presente nos dados
+    // Mantém o mês vigente selecionado mesmo quando ainda não há registros nele.
     const currentMonth = new Date().getMonth() + 1
-    if (months.includes(currentMonth)) {
-        monthFilter.value = String(currentMonth)
-    } else {
-        monthFilter.value = "all"
-    }
+    monthFilter.value = String(currentMonth)
 }
 
 function populateYearFilter(data) {

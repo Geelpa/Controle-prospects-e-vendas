@@ -253,17 +253,47 @@ function isReceivedPaymentRow(row) {
     return hasReceivedValueField(row) && getContractKeys(row).length > 0
 }
 
+function isActiveCustomerProfitabilityRow(row) {
+    const duplicateIdCount = Object.keys(row || {})
+        .filter(key => /^id(?:_\d+)?$/i.test(key))
+        .length
+
+    return duplicateIdCount > 1 &&
+        Boolean(getContractIdentity(row)) &&
+        [
+            COLUMN_MAP.valorContrato,
+            COLUMN_MAP.valorRecebido,
+            COLUMN_MAP.dataAtivacao,
+            COLUMN_MAP.plano
+        ].every(field => Object.prototype.hasOwnProperty.call(row, field))
+}
+
 function buildReceivedByContract(rows) {
     const receivedByContract = new Map()
+    const profitabilityReceivedByContract = new Map()
 
     rows.filter(isReceivedPaymentRow).forEach(row => {
         const amount = parseCurrencyLike(row[COLUMN_MAP.valorRecebido])
-        if (!amount) return
+        if (amount < 0) return
 
         const contractKey = getContractKeys(row)[0]
         if (!contractKey) return
 
+        if (isActiveCustomerProfitabilityRow(row)) {
+            // This export is cumulative per contract, so it overrides rather than adds payment rows.
+            const currentAmount = profitabilityReceivedByContract.get(contractKey)
+            if (currentAmount === undefined || amount > currentAmount) {
+                profitabilityReceivedByContract.set(contractKey, amount)
+            }
+            return
+        }
+
+        if (!amount) return
         receivedByContract.set(contractKey, (receivedByContract.get(contractKey) || 0) + amount)
+    })
+
+    profitabilityReceivedByContract.forEach((amount, contractKey) => {
+        receivedByContract.set(contractKey, amount)
     })
 
     return receivedByContract
@@ -555,6 +585,30 @@ function normalizeRowHeaders(row = {}) {
         if (!match) return
         normalized[targetKey] = normalized[match]
     })
+
+    const duplicateIdFields = Object.keys(row)
+        .filter(key => /^id(?:_\d+)?$/i.test(key))
+        .sort((first, second) => {
+            const firstIndex = Number(first.match(/_(\d+)$/)?.[1] || 0)
+            const secondIndex = Number(second.match(/_(\d+)$/)?.[1] || 0)
+            return firstIndex - secondIndex
+        })
+    const hasProfitabilityFields = [
+        COLUMN_MAP.valorContrato,
+        COLUMN_MAP.valorRecebido,
+        COLUMN_MAP.dataAtivacao,
+        COLUMN_MAP.plano
+    ].every(field => Object.prototype.hasOwnProperty.call(normalized, field))
+
+    if (duplicateIdFields.length > 1 && hasProfitabilityFields) {
+        // The active-customer export repeats ID: contract ID first, client ID second.
+        const contractId = normalizeCsvText(row[duplicateIdFields[0]])
+        const clientId = normalizeCsvText(row[duplicateIdFields[1]])
+        if (contractId && clientId) {
+            normalized[COLUMN_MAP.idContrato] = contractId
+            normalized[COLUMN_MAP.id] = clientId
+        }
+    }
 
     return normalized
 }
