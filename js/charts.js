@@ -895,6 +895,7 @@ function createChannelsChart(data) {
             rowsMatchingChartStatus(filteredData, COLUMN_MAP.canal, label, statusType)
         )
     )
+    channelsChart.summaryEntries = allEntries
 }
 
 function createCampaignsChart(data) {
@@ -928,6 +929,7 @@ function createCampaignsChart(data) {
             rowsMatchingChartStatus(uniqueData, COLUMN_MAP.campanha, label, statusType)
         )
     )
+    campaignsChart.summaryEntries = allEntries
 }
 
 function createLossReasonsChart(data) {
@@ -968,6 +970,7 @@ function createLossReasonsChart(data) {
             rowsMatchingChartValue(lostOnly, COLUMN_MAP.motivoPerda, label)
         )
     )
+    lossReasonsChart.summaryEntries = allEntries
 }
 
 function createLegacySalesPerDayChart(data) {
@@ -1623,6 +1626,7 @@ function createSellersChart(data) {
             rowsMatchingChartValue(wonOnly, COLUMN_MAP.vendedor, label)
         )
     )
+    sellersChart.summaryEntries = allEntries
 }
 
 function createInstallationChart(data) {
@@ -1811,4 +1815,5 @@ function createPlansChart(data) {
             rowsMatchingChartValue(wonWithPlan, COLUMN_MAP.plano, label)
         )
     )
+    plansChart.summaryEntries = allEntries
 }

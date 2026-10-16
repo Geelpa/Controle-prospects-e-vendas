@@ -292,6 +292,158 @@ async function copyGoalSummary(section) {
     }
 }
 
+function getChartForCopy(chartKey) {
+    const charts = {
+        plans: plansChart,
+        sellers: sellersChart,
+        channels: channelsChart,
+        campaigns: campaignsChart,
+        lossReasons: lossReasonsChart,
+        salesPerDay: salesPerDayChart,
+        installation: installationChart
+    }
+
+    return charts[chartKey]
+}
+
+function getSelectedFilterLabel(id) {
+    const select = document.getElementById(id)
+    if (!select) return ""
+
+    const selectedOption = select.options[select.selectedIndex]
+    return selectedOption?.textContent?.trim() || ""
+}
+
+function formatChartSummaryValue(value) {
+    const numericValue = Number(value)
+    if (!Number.isFinite(numericValue)) return "0"
+
+    return numericValue.toLocaleString("pt-BR", {
+        minimumFractionDigits: Number.isInteger(numericValue) ? 0 : 2,
+        maximumFractionDigits: 2
+    })
+}
+
+function getChartSummary(chartKey) {
+    const chart = getChartForCopy(chartKey)
+    if (!chart || !chart.data?.labels?.length) return ""
+
+    const headingId = chartKey === "salesPerDay"
+        ? "salesChartTitle"
+        : `${chartKey}ChartHeading`
+    const title = document.getElementById(headingId)?.textContent?.trim() || "Resumo do gráfico"
+    const month = getSelectedFilterLabel("monthFilter")
+    const year = getSelectedFilterLabel("yearFilter")
+    const seller = getSelectedFilterLabel("sellerFilter")
+    const filterParts = [month !== "Todos" ? month : "", year !== "Todos" ? year : ""]
+        .filter(Boolean)
+    const lines = [title]
+
+    if (filterParts.length || (seller && seller !== "Todos")) {
+        lines.push(`Filtros: ${[...filterParts, seller && seller !== "Todos" ? `Vendedor: ${seller}` : ""].filter(Boolean).join(" · ")}`)
+    }
+    if (chartKey === "salesPerDay") {
+        const grouping = getSelectedFilterLabel("salesViewFilter")
+        const week = getSelectedFilterLabel("weekFilter")
+        if (grouping) lines.push(`Agrupamento: ${grouping}`)
+        if (week && document.getElementById("weekFilter")?.value !== "all") {
+            lines.push(`Semana: ${week}`)
+        }
+    }
+
+    const labels = chart.data.labels.map(label =>
+        Array.isArray(label) ? label.join(" ") : String(label ?? "")
+    )
+    const datasets = chart.data.datasets || []
+    const summaryEntries = chart.summaryEntries
+
+    if (chart.config.type === "doughnut" || chart.config.type === "pie") {
+        const values = datasets[0]?.data || []
+        const total = values.reduce((sum, value) => sum + (Number(value) || 0), 0)
+        lines.push(`Total: ${formatChartSummaryValue(total)}`)
+        labels.forEach((label, index) => {
+            const value = Number(values[index]) || 0
+            const percent = total ? (value / total * 100).toLocaleString("pt-BR", {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            }) : "0,0"
+            lines.push(`${label}: ${formatChartSummaryValue(value)} (${percent}%)`)
+        })
+        return lines.join("\n")
+    }
+
+    if (summaryEntries?.length && Array.isArray(summaryEntries[0])) {
+        const total = summaryEntries.reduce((sum, [, value]) => sum + (Number(value) || 0), 0)
+        lines.push(`Total: ${formatChartSummaryValue(total)}`)
+        summaryEntries.forEach(([label, value]) => {
+            lines.push(`${label}: ${formatChartSummaryValue(value)}`)
+        })
+        return lines.join("\n")
+    }
+
+    if (summaryEntries?.length && !Array.isArray(summaryEntries[0])) {
+        const statusTypes = [
+            ["won", "Vencemos"],
+            ["lost", "Perdemos"],
+            ["noViability", "Sem viabilidade"]
+        ]
+        const totals = statusTypes.map(([key]) =>
+            summaryEntries.reduce((sum, entry) => sum + (Number(entry[key]) || 0), 0)
+        )
+        lines.push(`Total: ${formatChartSummaryValue(summaryEntries.reduce((sum, entry) => sum + (Number(entry.total) || 0), 0))}`)
+        statusTypes.forEach(([key, label], index) => {
+            if (totals[index]) lines.push(`- ${label}: ${formatChartSummaryValue(totals[index])}`)
+        })
+        lines.push("Detalhamento:")
+        summaryEntries.forEach(entry => {
+            const values = statusTypes
+                .filter(([key]) => Number(entry[key]) > 0)
+                .map(([key, label]) => `${label}: ${formatChartSummaryValue(entry[key])}`)
+            lines.push(`${entry.label}: ${values.join(" | ")} | Total: ${formatChartSummaryValue(entry.total)}`)
+        })
+        return lines.join("\n")
+    }
+
+    const totals = datasets.map(dataset =>
+        (dataset.data || []).reduce((sum, value) => sum + (Number(value) || 0), 0)
+    )
+    lines.push("Totais por série:")
+    datasets.forEach((dataset, index) => {
+        lines.push(`- ${dataset.label || `Série ${index + 1}`}: ${formatChartSummaryValue(totals[index])}`)
+    })
+    lines.push("Detalhamento:")
+
+    labels.forEach((label, index) => {
+        const values = datasets.map((dataset, datasetIndex) =>
+            `${dataset.label || `Série ${datasetIndex + 1}`}: ${formatChartSummaryValue(dataset.data?.[index])}`
+        )
+        lines.push(`${label}: ${values.join(" | ")}`)
+    })
+
+    return lines.join("\n")
+}
+
+document.querySelectorAll("[data-chart-copy]").forEach(button => {
+    button.addEventListener("click", async () => {
+        const chartKey = button.dataset.chartCopy
+        const status = document.getElementById(`${chartKey}ChartCopyStatus`)
+        const summary = getChartSummary(chartKey)
+
+        if (!summary) {
+            if (status) status.textContent = "Nenhum dado disponível para copiar."
+            return
+        }
+
+        try {
+            await writeGoalSummaryToClipboard(summary)
+            if (status) status.textContent = "Resumo copiado."
+        } catch (error) {
+            console.error(`Não foi possível copiar o resumo do gráfico "${chartKey}".`, error)
+            if (status) status.textContent = "Falha ao copiar. Verifique a permissão do navegador."
+        }
+    })
+})
+
 document.getElementById("copyLeadGoal")?.addEventListener("click", () =>
     copyGoalSummary("leads")
 )
