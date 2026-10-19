@@ -113,7 +113,7 @@ function processData(prospectData, salesData) {
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
     const inProgress = currentDashboardMetrics.prospectStatusRows.inProgress.length;
 
-    // Conversão: compara apenas oportunidades concluídas de aquisição (ganhas ou perdidas).
+    // Conversão: vencemos / (vencemos + perdemos); andamento e sem viabilidade ficam fora da base.
     // Planos adicionais e trocas de titularidade não são oportunidades novas.
     const conversionBase = conversionWonRows.length + lost;
 
