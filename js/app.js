@@ -835,6 +835,8 @@ function getRankingScore(entry, options) {
 }
 
 function enrichRankingEntries(entries, options) {
+    const totalCancellations = entries.reduce((total, entry) => total + entry.cancelled, 0);
+
     return entries.map(entry => ({
         ...entry,
         conversion: getRankingConversion(entry.won, entry.lost, options.globalConversion),
@@ -845,6 +847,9 @@ function enrichRankingEntries(entries, options) {
         averageDuration: entry.durationCount ? entry.durationMonths / entry.durationCount : 0,
         cancellationRate: entry.won + entry.cancelled > 0
             ? (entry.cancelled / (entry.won + entry.cancelled)) * 100
+            : 0,
+        cancellationShare: totalCancellations > 0
+            ? (entry.cancelled / totalCancellations) * 100
             : 0
     }));
 }
@@ -875,7 +880,7 @@ function formatRankingConversion(entry, includeRevenue = false) {
     ];
 
     if (entry.cancelled > 0) {
-        details.push(`${entry.cancellationRate.toFixed(1).replace(".", ",")}% cancelamento`);
+        details.push(`${entry.cancellationShare.toFixed(1).replace(".", ",")}% dos cancelamentos`);
     }
 
     if (includeRevenue && entry.revenue > 0) {
@@ -921,6 +926,7 @@ function updateTopRanking(metrics, sellerRows) {
         type: "seller",
         globalConversion,
         totalMonths,
+        totalRows: allRankingRows.length,
         maxWon: Math.max(...sellerEntries.map(entry => entry.won), 0),
         maxRevenue: Math.max(...sellerEntries.map(entry => entry.revenue), 0),
         maxReceived: Math.max(...sellerEntries.map(entry => entry.received), 0)
@@ -933,6 +939,7 @@ function updateTopRanking(metrics, sellerRows) {
         type: "conversion",
         globalConversion: acquisitionConversion,
         totalMonths: acquisitionMonths,
+        totalRows: acquisitionRows.length,
         minimumWon: 5,
         maxWon: Math.max(...entries.map(entry => entry.won), 0),
         maxAverageTicket: Math.max(...entries.map(entry => entry.won ? entry.revenue / entry.won : 0), 0)
@@ -944,6 +951,7 @@ function updateTopRanking(metrics, sellerRows) {
         type: "plan",
         globalConversion,
         totalMonths,
+        totalRows: allRankingRows.length,
         maxWon: Math.max(...planEntries.map(entry => entry.won), 0),
         maxReceived: Math.max(...planEntries.map(entry => entry.totalCollected), 0),
         maxAverageReceived: Math.max(...planEntries.map(entry => entry.won ? entry.totalCollected / entry.won : 0), 0),
@@ -965,7 +973,7 @@ function updateTopRanking(metrics, sellerRows) {
 
     document.getElementById("topSellerName").textContent = topSeller?.label || "Sem dados";
     document.getElementById("topSellerDetail").textContent = topSeller
-        ? `${topSeller.won} ${topSeller.won === 1 ? "venda" : "vendas"} • nota ${(topSeller.score * 100).toFixed(0)} • ${formatRankingMoney(topSeller.revenue)}${topSeller.cancelled ? ` • ${topSeller.cancellationRate.toFixed(1).replace(".", ",")}% cancelamento` : ""}`
+        ? `${topSeller.won} ${topSeller.won === 1 ? "venda" : "vendas"} • nota ${(topSeller.score * 100).toFixed(0)} • ${formatRankingMoney(topSeller.revenue)}${topSeller.cancelled ? ` • ${topSeller.cancellationShare.toFixed(1).replace(".", ",")}% dos cancelamentos` : ""}`
         : "Sem vendas no período";
 
     document.getElementById("topCampaignName").textContent = topCampaign?.label || "Sem campanha elegível";
@@ -1017,12 +1025,12 @@ function getRankingSortHeaders(category) {
             ["label", "Plano"], ["won", "Ativacoes"],
             ["received", "Recebido"], ["activationTax", "Taxa paga"],
             ["totalCollected", "Total + taxa"], ["averageCollected", "Total/ativacao"],
-            ["averageDuration", "Permanencia media"], ["cancellationRate", "Cancelamentos"], ["score", "Nota"]
+            ["averageDuration", "Permanencia media"], ["cancelled", "Cancelamentos"], ["score", "Nota"]
         ]
         : [
             ["label", "Nome"], ["won", "Ativacoes"], ["conversion", "Conversao ajustada"],
             ["received", "Valor recebido total"], ["averageReceived", "Recebido/ativacao"],
-            ["averageTicket", "Ticket medio"], ["cancellationRate", "Cancelamentos"], ["score", "Nota"]
+            ["averageTicket", "Ticket medio"], ["cancelled", "Cancelamentos"], ["score", "Nota"]
         ];
 }
 
@@ -1092,7 +1100,7 @@ function renderRankingDetail(category = activeRankingCategory) {
             ${category === "plan" ? `<td>${formatRankingMoney(entry.activationTax)}</td><td>${formatRankingMoney(entry.totalCollected)}</td><td>${formatRankingMoney(entry.averageCollected)}</td>` : `<td>${formatRankingMoney(entry.averageReceived)}</td>`}
             ${category === "plan" ? "" : `<td>${formatRankingMoney(entry.averageTicket)}</td>`}
             ${category === "plan" ? `<td>${entry.averageDuration.toFixed(1).replace(".", ",")} meses</td>` : ""}
-            <td>${entry.cancelled} (${entry.cancellationRate.toFixed(1).replace(".", ",")}%)</td>
+            <td>${entry.cancelled} (${entry.cancellationShare.toFixed(1).replace(".", ",")}% dos cancelamentos)</td>
             <td class="font-semibold text-[#e7b77d]">${(entry.score * 100).toFixed(0)}</td>
         `;
         body.appendChild(row);
