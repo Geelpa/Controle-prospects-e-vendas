@@ -4,11 +4,11 @@ function updateKPIs({
     activationsDailyAverage,
     won,
     lost,
+    aborted,
     noViability,
     inProgress,
     alreadyClients,
-    inactive,
-    withdrawn,
+    preContract,
     cancelled,
     conversion,
     averageTicket,
@@ -32,6 +32,8 @@ function updateKPIs({
     document.getElementById("lostDealsPercent").innerText =
         `${getKpiPercent(lost, total)}% do total`
 
+    document.getElementById("abortedDealsBelowLost").innerText = aborted
+
     document.getElementById("noViabilityDeals").innerText =
         noViability
     document.getElementById("noViabilityDealsPercent").innerText =
@@ -43,8 +45,7 @@ function updateKPIs({
         `${getKpiPercent(inProgress, total)}% do total`
 
     document.getElementById("alreadyClientsDeals").innerText = alreadyClients
-    document.getElementById("inactiveDeals").innerText = inactive
-    document.getElementById("withdrawnDeals").innerText = withdrawn
+    document.getElementById("preContractDeals").innerText = preContract
     document.getElementById("cancelledDeals").innerText = cancelled
 
     document.getElementById("totalTaxPaid").innerText =

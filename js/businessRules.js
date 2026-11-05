@@ -29,7 +29,9 @@ const isNewProspect = (item, map = COLUMN_MAP) =>
 
 function getProspectStatusCategory(item) {
     const status = normalize(item?.[COLUMN_MAP.status])
+    if (STATUS.won.includes(status)) return "won"
     if (STATUS.lost.includes(status)) return "lost"
+    if (STATUS.aborted.includes(status)) return "aborted"
     if (STATUS.noViability.includes(status)) return "noViability"
     if (STATUS.inProgress.includes(status)) return "inProgress"
     return "other"

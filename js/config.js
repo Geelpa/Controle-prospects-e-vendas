@@ -50,6 +50,10 @@ const STATUS = {
         "perdemos"
     ],
 
+    aborted: [
+        "abortamos"
+    ],
+
     noViability: [
         "sem viabilidade"
     ],

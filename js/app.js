@@ -75,10 +75,9 @@ function processData(prospectData, salesData) {
     const currentProspectData = prospectsData;
     const totalProspects = prospectsData.length;
 
-    // As vendas e ativações devem considerar também adicionais e troca de titularidade,
-    // porque ambos podem gerar contrato novo mesmo sem serem "prospect novo".
+    // Vencemos inclui contratos ativos e prospects com status Vencemos, deduplicados.
     const wonRows = currentDashboardMetrics.wonRows;
-    const won = wonRows.length;
+    const won = currentDashboardMetrics.wonKpiRows.length;
     const prospectsDailyAverage = getFilteredDailyAverage(
         prospectsData,
         extractRegistrationDate
@@ -86,10 +85,6 @@ function processData(prospectData, salesData) {
     const activationsDailyAverage = getFilteredDailyAverage(
         wonRows,
         extractActivationDate
-    );
-    const conversionWonRows = wonRows.filter(item =>
-        !isAdditionalPlan(item, COLUMN_MAP) &&
-        !isOwnershipTransferChannel(item)
     );
     const alreadyClients = getUniqueWonRows(
         (salesData || []).filter(item => isAdditionalPlan(item, COLUMN_MAP))
@@ -106,22 +101,27 @@ function processData(prospectData, salesData) {
     const countContractCategory = category => contractStatusRows.filter(item =>
         getContractStatusCategory(item) === category
     ).length;
-    const inactive = contractStatusRows.filter(isInactiveContract).length;
-    const withdrawn = countContractCategory("withdrawn");
+    const preContract = countContractCategory("preContract");
     const cancelled = countContractCategory("cancelled");
 
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
     const inProgress = currentDashboardMetrics.prospectStatusRows.inProgress.length;
 
-    // Conversão: vencemos / (vencemos + perdemos); andamento e sem viabilidade ficam fora da base.
-    // Planos adicionais e trocas de titularidade não são oportunidades novas.
-    const conversionBase = conversionWonRows.length + lost;
+    const wonKpiKeys = new Set(currentDashboardMetrics.wonKpiRows.map(getWinDedupKey));
+    const conversionBase = prospectsData.filter(item => {
+        if (wonKpiKeys.has(getWinDedupKey(item))) return true;
+
+        const status = normalize(item?.[COLUMN_MAP.status]);
+        const isNotStartedOrInProgress = STATUS.inProgress.includes(status) ||
+            ["em andamento", "não iniciou", "nao iniciou"].includes(status);
+
+        return !STATUS.noViability.includes(status) && !isNotStartedOrInProgress;
+    }).length;
 
     const conversion =
         conversionBase > 0
-            ? ((conversionWonRows.length / conversionBase) * 100).toFixed(1)
+            ? ((won / conversionBase) * 100).toFixed(1)
             : 0;
-
 
     // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
     // Inclui vendas de planos adicionais como receita de contrato, sem somá-los aos prospects.
@@ -169,11 +169,11 @@ function processData(prospectData, salesData) {
         activationsDailyAverage,
         won,
         lost,
+        aborted: currentDashboardMetrics.prospectStatusRows.aborted.length,
         noViability,
         inProgress,
         alreadyClients,
-        inactive,
-        withdrawn,
+        preContract,
         cancelled,
         conversion,
         averageTicket,
@@ -661,6 +661,7 @@ function buildDashboardMetrics(prospectData, salesData) {
     const prospectStatusRows = {
         won: [],
         lost: [],
+        aborted: [],
         noViability: [],
         inProgress: [],
         other: []
@@ -671,6 +672,9 @@ function buildDashboardMetrics(prospectData, salesData) {
     });
 
     const wonRows = getUniqueWonRows(salesRows);
+    const wonKpiRows = Array.from(new Map(
+        [...wonRows, ...prospectStatusRows.won].map(item => [getWinDedupKey(item), item])
+    ).values());
     const rankingRows = [
         ...wonRows,
         ...getDeduplicatedChartRows(salesRows.filter(item => !isWon(item)))
@@ -678,7 +682,7 @@ function buildDashboardMetrics(prospectData, salesData) {
         isWon(item) || isLossStatus(item) || isRankingContractPenalty(item)
     );
 
-    return { prospects, salesRows, prospectStatusRows, wonRows, rankingRows };
+    return { prospects, salesRows, prospectStatusRows, wonRows, wonKpiRows, rankingRows };
 }
 
 function getRankingGroupLabel(item, columnName) {
@@ -1682,7 +1686,7 @@ function getRowsByDrilldownType(type) {
 
     // Prospects-related drilldowns should use the registration-based dataset
     if (type === "prospects") return currentDashboardMetrics?.prospects || prospectRows;
-    if (["inProgress", "lost", "noViability"].includes(type)) {
+    if (["inProgress", "lost", "aborted", "noViability"].includes(type)) {
         return currentDashboardMetrics?.prospectStatusRows[type] || [];
     }
     if (type === "inactive") {
@@ -1698,7 +1702,7 @@ function getRowsByDrilldownType(type) {
     }
 
     // Sales/activation-related drilldowns use the sales/activation dataset
-    if (type === "won") return currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows);
+    if (type === "won") return currentDashboardMetrics?.wonKpiRows || getUniqueWonRows(salesRows);
     if (type === "installationPaid") return (currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows)).filter(item => !isFreeInstallation(item));
     if (type === "installationFree") return (currentDashboardMetrics?.wonRows || getUniqueWonRows(salesRows)).filter(item => isFreeInstallation(item));
     if (type === "taxPaid") return salesRows.filter(item => parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0);
