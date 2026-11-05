@@ -1,5 +1,6 @@
 function updateKPIs({
     total,
+    validProspects,
     prospectsDailyAverage,
     activationsDailyAverage,
     won,
@@ -19,6 +20,8 @@ function updateKPIs({
 
     document.getElementById("totalProspects").innerText =
         total
+    document.getElementById("validProspects").innerText =
+        `Prospects válidos: ${validProspects}`
     document.getElementById("prospectsDailyAverage").innerText =
         formatDailyKpi(prospectsDailyAverage)
 

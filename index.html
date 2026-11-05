@@ -818,6 +818,7 @@
                     <h2 id="totalProspects" class="text-3xl font-semibold mt-2">
                         0
                     </h2>
+                    <p id="validProspects" class="text-xs font-medium mt-1 text-[#c9a98d]">Prospects válidos: 0</p>
                     <p id="prospectsDailyAverage" class="text-xs font-medium mt-1 text-[#c9a98d]">-- por dia</p>
 
                 </div>
@@ -1094,7 +1095,7 @@
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#e2a463]">Planejamento comercial</p>
                     <h2 id="goalMonthTitle" class="mt-1 text-2xl font-semibold text-[#fff4e5]">Meta do mês vigente</h2>
                     <p class="mt-1 max-w-3xl text-xs leading-5 text-[#d6ad87]">
-                        Acompanhe realizado, conversão dos leads cadastrados no mês selecionado e projeção até o fim do período.
+                        Acompanhe as metas de ativações e leads, a conversão dos prospects válidos e as médias diárias do mês selecionado.
                     </p>
                 </div>
                 <span class="rounded-full border border-[#876247] bg-[#4b3528] px-3 py-1.5 text-[0.68rem] font-medium text-[#e5c9ac]">
@@ -1124,7 +1125,7 @@
                                 <div class="border-l border-[#765640] pl-3">
                                     <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Necessário para a meta</p>
                                     <p id="leadMonthlyTarget" class="mt-1 text-2xl font-bold tracking-tight text-[#fff4e5]">--</p>
-                                    <p class="text-[0.68rem] text-[#c9a98d]">para alcançar 240 ativações</p>
+                                    <p class="text-[0.68rem] text-[#c9a98d]">para alcançar <span id="leadActivationGoal">240</span> ativações</p>
                                 </div>
                             </div>
                             <div class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#211812]" role="progressbar" aria-label="Progresso da meta de leads" aria-valuemin="0" aria-valuemax="100">
@@ -1149,9 +1150,9 @@
                                 <p class="text-[0.62rem] text-[#c9a98d]">leads / dia</p>
                             </div>
                             <div class="rounded-lg border border-[#d6ad87]/20 bg-[#4b3528]/55 p-3">
-                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Meta fixa</p>
-                                <p class="mt-1 text-lg font-semibold text-[#fff4e5]">240</p>
-                                <p class="text-[0.62rem] text-[#c9a98d]">ativações</p>
+                                <p class="text-[0.62rem] font-semibold uppercase tracking-wide text-[#d6ad87]">Meta diária</p>
+                                <p id="leadDailyTarget" class="mt-1 text-lg font-semibold text-[#fff4e5]">--</p>
+                                <p class="text-[0.62rem] text-[#c9a98d]">leads / dia corrido</p>
                             </div>
                         </div>
                         <p id="leadGoalFormula" class="text-[0.68rem] leading-5 text-[#d6ad87]">Calculando...</p>
@@ -1178,7 +1179,7 @@
                                     <p class="text-[0.68rem] text-[#a9c6b2]">ativações no mês</p>
                                 </div>
                                 <div class="border-l border-[#557562] pl-3">
-                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Meta esperada</p>
+                                    <p class="text-[0.65rem] font-semibold uppercase tracking-wide text-[#a9c6b2]">Meta mensal</p>
                                     <p id="activationMonthlyTarget" class="mt-1 text-2xl font-bold tracking-tight text-[#f2fff5]">--</p>
                                     <p class="text-[0.68rem] text-[#a9c6b2]">ativações</p>
                                 </div>

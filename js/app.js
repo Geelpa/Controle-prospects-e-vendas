@@ -96,6 +96,7 @@ function processData(prospectData, salesData) {
 
     // SEM VIABILIDADE: apenas status 'sem viabilidade'
     const noViability = currentDashboardMetrics.prospectStatusRows.noViability.length;
+    const validProspects = totalProspects - noViability;
 
     const contractStatusRows = salesData || [];
     const countContractCategory = category => contractStatusRows.filter(item =>
@@ -165,6 +166,7 @@ function processData(prospectData, salesData) {
     // --- BLOCO DE ATUALIZAÇÃO DOS CARDS NA TELA ---
     updateKPIs({
         total: totalProspects,
+        validProspects,
         prospectsDailyAverage,
         activationsDailyAverage,
         won,
@@ -538,16 +540,23 @@ function updateMonthlyGoal() {
             entry.date >= targetMonthStart &&
             entry.date <= observedThroughDate)
 
-    const acquisitionRows = monthLeads
-        .map(entry => entry.item)
-        .filter(item => !isOwnershipTransferChannel(item))
-    const conversionWins = getUniqueWonRows(acquisitionRows).length
-    const conversionLosses = acquisitionRows.filter(item =>
-        STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status]))
-    ).length
-    const completedOpportunities = conversionWins + conversionLosses
-    const conversionRate = completedOpportunities > 0
-        ? conversionWins / completedOpportunities
+    const acquisitionRows = monthLeads.map(entry => entry.item)
+    const conversionWonRows = acquisitionRows.filter(item =>
+        isWon(item) || STATUS.won.includes(normalize(item?.[COLUMN_MAP.status]))
+    )
+    const conversionWonKeys = new Set(conversionWonRows.map(getWinDedupKey))
+    const eligibleLeadRows = acquisitionRows.filter(item => {
+        if (conversionWonKeys.has(getWinDedupKey(item))) return true
+
+        const status = normalize(item?.[COLUMN_MAP.status])
+        return !STATUS.noViability.includes(status) &&
+            !STATUS.inProgress.includes(status) &&
+            !["em andamento", "não iniciou", "nao iniciou"].includes(status)
+    })
+    const conversionWins = conversionWonRows.length
+    const eligibleProspects = eligibleLeadRows.length
+    const conversionRate = eligibleProspects > 0
+        ? conversionWins / eligibleProspects
         : 0
     const elapsedMonthDays = isTargetMonthFuture
         ? 0
@@ -568,6 +577,9 @@ function updateMonthlyGoal() {
     const leadTarget = conversionRate > 0
         ? Math.ceil(monthlyActivationGoal / conversionRate)
         : null
+    const leadDailyTarget = leadTarget === null
+        ? null
+        : leadTarget / targetMonthDays
     const estimatedActivations = leadTarget === null || projectedLeadCount === null
         ? null
         : projectedLeadCount * conversionRate
@@ -595,6 +607,7 @@ function updateMonthlyGoal() {
     }
 
     setText("activationMonthlyTarget", formatCount(monthlyActivationGoal))
+    setText("leadActivationGoal", formatCount(monthlyActivationGoal))
     setText("activationMonthActual", formatCount(monthActivationRows.length))
     setText("activationRemainingTarget", `${formatCount(remainingActivations)} ativações restantes para a meta`)
     setText("activationDailyAverage", activationDailyAverage === null
@@ -607,7 +620,7 @@ function updateMonthlyGoal() {
         ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
         : "--")
     setText("activationGoalFormula", leadTarget === null
-        ? "Sem conversões concluídas neste mês para calcular a projeção."
+        ? "Sem conversões entre prospects válidos neste mês para calcular a meta de leads."
         : projectedLeadCount === null
             ? `Projeção indisponível para o mês futuro. Conversão do mês: ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%.`
             : `${formatDailyAverage(projectedLeadCount / targetMonthDays)} leads/dia projetam ${formatCount(projectedLeadCount)} leads no mês; × ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${Math.round(estimatedActivations).toLocaleString("pt-BR")} ativações estimadas.`)
@@ -619,35 +632,40 @@ function updateMonthlyGoal() {
     setText("leadDailyAverage", leadDailyAverage === null
         ? "--"
         : `${formatDailyAverage(leadDailyAverage)} por dia`)
+    setText("leadDailyTarget", leadDailyTarget === null
+        ? "--"
+        : formatDailyAverage(leadDailyTarget))
     setText("leadEstimatedTarget", projectedLeadCount === null
         ? "--"
         : formatCount(projectedLeadCount))
     setText("leadGoalFormula", leadTarget === null
-        ? `Sem oportunidades concluídas no mês de ${targetLabel}; a meta de ${formatCount(monthlyActivationGoal)} ativações não pode ser convertida em quantidade de leads.`
-        : `${formatCount(monthlyActivationGoal)} ativações ÷ ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão deste mês = ${formatCount(leadTarget)} leads no total.`)
+        ? `Sem conversões entre prospects válidos no mês de ${targetLabel}; não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
+        : `${formatCount(monthlyActivationGoal)} ativações ÷ ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${formatCount(leadTarget)} leads no mês, ou ${formatDailyAverage(leadDailyTarget)} leads por dia corrido.`)
     setText("goalConversion", conversionRate > 0
         ? `${(conversionRate * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
         : "--")
-    setText("goalConversionDetail", completedOpportunities > 0
-        ? `${conversionWins} ativações ÷ ${completedOpportunities} oportunidades concluídas entre os leads cadastrados em ${formatMonth(targetDate)}`
-        : `Sem oportunidades concluídas entre os leads cadastrados em ${formatMonth(targetDate)}`)
+    setText("goalConversionDetail", eligibleProspects > 0
+        ? `${conversionWins} Vencemos ÷ ${eligibleProspects} prospects válidos cadastrados em ${formatMonth(targetDate)}`
+        : `Sem prospects válidos cadastrados em ${formatMonth(targetDate)}`)
     setText("goalHistoryPeriod", isTargetMonthFuture
         ? `Mês selecionado: ${targetLabel} · O período ainda não começou.`
-        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão calculada apenas com leads concluídos neste mês.`)
+        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão: Vencemos ÷ prospects válidos.`)
     setText("goalStatus", leadTarget === null
-        ? `Meta fixa: ${formatCount(monthlyActivationGoal)} ativações. A conversão será calculada quando houver oportunidades concluídas no mês selecionado.`
+        ? `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A meta de leads depende da conversão dos prospects válidos do mês selecionado.`
         : `Projeção e conversão calculadas com os dados de ${targetLabel}; o realizado e os leads restantes refletem o andamento do próprio mês.`)
 
     latestGoalSummary = {
         leads: [
             `Meta de ${targetLabel} — Leads / prospects`,
             `Realizado: ${formatCount(monthLeads.length)} de ${leadTarget === null ? "meta não calculada" : `${formatCount(leadTarget)} necessários`} (${formatPercent(monthLeads.length, leadTarget)}).`,
+            `Meta diária: ${leadDailyTarget === null ? "indisponível" : `${formatDailyAverage(leadDailyTarget)} leads/dia corrido`}.`,
             `Projeção até o fim do mês: ${projectedLeadCount === null ? "indisponível" : formatCount(projectedLeadCount)} leads.`,
             `Conversão da safra: ${conversionRate > 0 ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "indisponível"}.`
         ].join("\n"),
         activations: [
             `Meta de ${targetLabel} — Ativações`,
             `Realizado: ${formatCount(monthActivationRows.length)} de ${formatCount(monthlyActivationGoal)} (${formatPercent(monthActivationRows.length, monthlyActivationGoal)}).`,
+            `Média realizada: ${activationDailyAverage === null ? "indisponível" : `${formatDailyAverage(activationDailyAverage)} ativações/dia`}.`,
             estimatedActivations === null
                 ? "Estimativa até o fim do mês: indisponível sem conversão calculada."
                 : `Estimativa até o fim do mês: ${formatCount(Math.round(estimatedActivations))} ativações.`
