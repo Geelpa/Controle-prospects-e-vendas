@@ -108,20 +108,10 @@ function processData(prospectData, salesData) {
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
     const inProgress = currentDashboardMetrics.prospectStatusRows.inProgress.length;
 
-    const wonKpiKeys = new Set(currentDashboardMetrics.wonKpiRows.map(getWinDedupKey));
-    const conversionBase = prospectsData.filter(item => {
-        if (wonKpiKeys.has(getWinDedupKey(item))) return true;
-
-        const status = normalize(item?.[COLUMN_MAP.status]);
-        const isNotStartedOrInProgress = STATUS.inProgress.includes(status) ||
-            ["em andamento", "não iniciou", "nao iniciou"].includes(status);
-
-        return !STATUS.noViability.includes(status) && !isNotStartedOrInProgress;
-    }).length;
-
+    const conversionOutcomeCount = won + lost;
     const conversion =
-        conversionBase > 0
-            ? ((won / conversionBase) * 100).toFixed(1)
+        conversionOutcomeCount > 0
+            ? ((won / conversionOutcomeCount) * 100).toFixed(1)
             : 0;
 
     // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
@@ -545,18 +535,14 @@ function updateMonthlyGoal() {
         isWon(item) || STATUS.won.includes(normalize(item?.[COLUMN_MAP.status]))
     )
     const conversionWonKeys = new Set(conversionWonRows.map(getWinDedupKey))
-    const eligibleLeadRows = acquisitionRows.filter(item => {
-        if (conversionWonKeys.has(getWinDedupKey(item))) return true
-
-        const status = normalize(item?.[COLUMN_MAP.status])
-        return !STATUS.noViability.includes(status) &&
-            !STATUS.inProgress.includes(status) &&
-            !["em andamento", "não iniciou", "nao iniciou"].includes(status)
-    })
     const conversionWins = conversionWonRows.length
-    const eligibleProspects = eligibleLeadRows.length
-    const conversionRate = eligibleProspects > 0
-        ? conversionWins / eligibleProspects
+    const conversionLosses = acquisitionRows.filter(item =>
+        !conversionWonKeys.has(getWinDedupKey(item)) &&
+        STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status]))
+    ).length
+    const conversionOutcomeCount = conversionWins + conversionLosses
+    const conversionRate = conversionOutcomeCount > 0
+        ? conversionWins / conversionOutcomeCount
         : 0
     const elapsedMonthDays = isTargetMonthFuture
         ? 0
@@ -620,7 +606,7 @@ function updateMonthlyGoal() {
         ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
         : "--")
     setText("activationGoalFormula", leadTarget === null
-        ? "Sem conversões entre prospects válidos neste mês para calcular a meta de leads."
+        ? "Sem Vencemos ou Perdemos neste mês para calcular a taxa de conversão e a meta de leads."
         : projectedLeadCount === null
             ? `Projeção indisponível para o mês futuro. Conversão do mês: ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%.`
             : `${formatDailyAverage(projectedLeadCount / targetMonthDays)} leads/dia projetam ${formatCount(projectedLeadCount)} leads no mês; × ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${Math.round(estimatedActivations).toLocaleString("pt-BR")} ativações estimadas.`)
@@ -639,19 +625,19 @@ function updateMonthlyGoal() {
         ? "--"
         : formatCount(projectedLeadCount))
     setText("leadGoalFormula", leadTarget === null
-        ? `Sem conversões entre prospects válidos no mês de ${targetLabel}; não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
+        ? `Sem Vencemos ou Perdemos no mês de ${targetLabel}; não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
         : `${formatCount(monthlyActivationGoal)} ativações ÷ ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${formatCount(leadTarget)} leads no mês, ou ${formatDailyAverage(leadDailyTarget)} leads por dia corrido.`)
     setText("goalConversion", conversionRate > 0
         ? `${(conversionRate * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
         : "--")
-    setText("goalConversionDetail", eligibleProspects > 0
-        ? `${conversionWins} Vencemos ÷ ${eligibleProspects} prospects válidos cadastrados em ${formatMonth(targetDate)}`
-        : `Sem prospects válidos cadastrados em ${formatMonth(targetDate)}`)
+    setText("goalConversionDetail", conversionOutcomeCount > 0
+        ? `${conversionWins} Vencemos ÷ (${conversionWins} Vencemos + ${conversionLosses} Perdemos) em ${formatMonth(targetDate)}`
+        : `Sem Vencemos ou Perdemos em ${formatMonth(targetDate)}`)
     setText("goalHistoryPeriod", isTargetMonthFuture
         ? `Mês selecionado: ${targetLabel} · O período ainda não começou.`
-        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão: Vencemos ÷ prospects válidos.`)
+        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão: Vencemos ÷ (Vencemos + Perdemos).`)
     setText("goalStatus", leadTarget === null
-        ? `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A meta de leads depende da conversão dos prospects válidos do mês selecionado.`
+        ? `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A meta de leads depende de haver Vencemos ou Perdemos no mês selecionado.`
         : `Projeção e conversão calculadas com os dados de ${targetLabel}; o realizado e os leads restantes refletem o andamento do próprio mês.`)
 
     latestGoalSummary = {
