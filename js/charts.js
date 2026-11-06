@@ -938,11 +938,11 @@ function createLossReasonsChart(data) {
 
     const uniqueData = getDeduplicatedChartRows(data)
     const lostOnly = uniqueData.filter(isLossStatus)
-
-    const grouped = groupBy(
-        lostOnly,
-        COLUMN_MAP.motivoPerda
-    )
+    const grouped = Object.create(null)
+    lostOnly.forEach(item => {
+        const reason = getLossReason(item)
+        grouped[reason] = (grouped[reason] || 0) + 1
+    })
     const allEntries = getTopEntries(grouped, Infinity)
 
     if (!hasComparisonData(allEntries)) {
@@ -967,10 +967,17 @@ function createLossReasonsChart(data) {
         CHART_COLORS.rose,
         label => openChartRows(
             `Motivo de perda: ${label}`,
-            rowsMatchingChartValue(lostOnly, COLUMN_MAP.motivoPerda, label)
+            lostOnly.filter(item =>
+                normalize(getLossReason(item)) === normalize(label)
+            )
         )
     )
     lossReasonsChart.summaryEntries = allEntries
+}
+
+function getLossReason(item) {
+    const reason = String(item?.[COLUMN_MAP.motivoPerda] ?? "").trim()
+    return reason || String(item?.[COLUMN_MAP.descricao] ?? "").trim()
 }
 
 function createLegacySalesPerDayChart(data) {

@@ -7,9 +7,9 @@ function updateKPIs({
     lost,
     aborted,
     noViability,
+    generalLosses,
     inProgress,
     alreadyClients,
-    preContract,
     cancelled,
     conversion,
     averageTicket,
@@ -48,7 +48,7 @@ function updateKPIs({
         `${getKpiPercent(inProgress, total)}% do total`
 
     document.getElementById("alreadyClientsDeals").innerText = alreadyClients
-    document.getElementById("preContractDeals").innerText = preContract
+    document.getElementById("generalLossesDeals").innerText = generalLosses
     document.getElementById("cancelledDeals").innerText = cancelled
 
     document.getElementById("totalTaxPaid").innerText =

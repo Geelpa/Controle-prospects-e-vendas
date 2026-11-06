@@ -24,6 +24,7 @@ const COLUMN_MAP = {
     vendedorContrato: "Vendedor Contrato",
     prospeccao: "Prospecção",
     status: "Status",
+    descricao: "Descrição",
     motivoPerda: "Motivo perdemos",
     plano: "Plano de venda",
     data: "Data do Cadastro",
@@ -72,6 +73,10 @@ const STATUS = {
         "pré contrato",
         "pre contrato"
     ],
+    contractActive: [
+        "ativo",
+        "active"
+    ],
     contractInactive: [
         "inativo"
     ],
@@ -103,9 +108,12 @@ function getContractStatusCategory(item) {
         return "withdrawn"
     }
 
-    const description = normalize(item?.[COLUMN_MAP.motivoPerda])
-    if (description.includes("cancel")) return "cancelled"
-    if (description.includes("desist")) return "withdrawn"
+    const descriptions = [
+        item?.[COLUMN_MAP.descricao],
+        item?.[COLUMN_MAP.motivoPerda]
+    ].map(normalize)
+    if (descriptions.some(description => description.includes("cancel"))) return "cancelled"
+    if (descriptions.some(description => description.includes("desist"))) return "withdrawn"
 
     const status = normalize(item?.[COLUMN_MAP.statusContrato])
     if (STATUS.contractPre.includes(status)) return "preContract"

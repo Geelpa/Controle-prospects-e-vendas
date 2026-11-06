@@ -96,13 +96,13 @@ function processData(prospectData, salesData) {
 
     // SEM VIABILIDADE: apenas status 'sem viabilidade'
     const noViability = currentDashboardMetrics.prospectStatusRows.noViability.length;
-    const validProspects = totalProspects - noViability;
+    const generalLosses = prospectsData.filter(isGeneralLossProspect).length;
+    const validProspects = prospectsData.filter(isValidProspect).length;
 
     const contractStatusRows = salesData || [];
     const countContractCategory = category => contractStatusRows.filter(item =>
         getContractStatusCategory(item) === category
     ).length;
-    const preContract = countContractCategory("preContract");
     const cancelled = countContractCategory("cancelled");
 
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
@@ -163,9 +163,9 @@ function processData(prospectData, salesData) {
         lost,
         aborted: currentDashboardMetrics.prospectStatusRows.aborted.length,
         noViability,
+        generalLosses,
         inProgress,
         alreadyClients,
-        preContract,
         cancelled,
         conversion,
         averageTicket,
@@ -531,9 +531,7 @@ function updateMonthlyGoal() {
             entry.date <= observedThroughDate)
 
     const acquisitionRows = monthLeads.map(entry => entry.item)
-    const conversionWonRows = acquisitionRows.filter(item =>
-        isWon(item) || STATUS.won.includes(normalize(item?.[COLUMN_MAP.status]))
-    )
+    const conversionWonRows = acquisitionRows.filter(isWon)
     const conversionWonKeys = new Set(conversionWonRows.map(getWinDedupKey))
     const conversionWins = conversionWonRows.length
     const conversionLosses = acquisitionRows.filter(item =>
@@ -677,7 +675,7 @@ function buildDashboardMetrics(prospectData, salesData) {
 
     const wonRows = getUniqueWonRows(salesRows);
     const wonKpiRows = Array.from(new Map(
-        [...wonRows, ...prospectStatusRows.won].map(item => [getWinDedupKey(item), item])
+        wonRows.map(item => [getWinDedupKey(item), item])
     ).values());
     const rankingRows = [
         ...wonRows,
@@ -1690,6 +1688,7 @@ function getRowsByDrilldownType(type) {
 
     // Prospects-related drilldowns should use the registration-based dataset
     if (type === "prospects") return currentDashboardMetrics?.prospects || prospectRows;
+    if (type === "generalLosses") return prospectRows.filter(isGeneralLossProspect);
     if (["inProgress", "lost", "aborted", "noViability"].includes(type)) {
         return currentDashboardMetrics?.prospectStatusRows[type] || [];
     }
