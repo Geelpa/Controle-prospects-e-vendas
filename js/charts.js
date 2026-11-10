@@ -723,6 +723,140 @@ function rowsMatchingChartStatus(data, columnName, label, statusType) {
     )
 }
 
+function getTaxStatusEntries(data, columnName) {
+    const grouped = new Map()
+
+    data.forEach(item => {
+        const label = getChartDisplayValue(item, columnName) || ""
+        const normalizedLabel = normalize(label)
+        if (!normalizedLabel || normalizedLabel === "undefined") return
+
+        if (!grouped.has(normalizedLabel)) {
+            grouped.set(normalizedLabel, {
+                label,
+                paid: 0,
+                exempt: 0,
+                total: 0
+            })
+        }
+
+        const entry = grouped.get(normalizedLabel)
+        if (parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0) {
+            entry.paid++
+        } else {
+            entry.exempt++
+        }
+        entry.total++
+    })
+
+    return [...grouped.values()]
+        .sort((first, second) =>
+            second.total - first.total ||
+            first.label.localeCompare(second.label, "pt-BR")
+        )
+}
+
+function createTaxStatusBarChart(canvasId, entries, columnName, data, colors) {
+    const maxTotal = Math.max(...entries.map(entry => entry.total), 0)
+    const options = horizontalBarOptions()
+
+    options.scales.x.stacked = true
+    options.scales.y.stacked = true
+    options.scales.x.suggestedMax = maxTotal ? Math.ceil(maxTotal * 1.28) : 0
+    options.scales.x.ticks.display = false
+    options.scales.x.grid.display = false
+    options.plugins.legend = {
+        display: true,
+        position: "top",
+        align: "end",
+        labels: {
+            color: CHART_COLORS.text,
+            usePointStyle: true,
+            pointStyle: "circle",
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 12,
+            font: {
+                size: 12,
+                weight: "600"
+            }
+        }
+    }
+    options.plugins.tooltip = {
+        ...baseOptions().plugins.tooltip,
+        displayColors: true,
+        callbacks: {
+            title(context) {
+                return entries[context[0].dataIndex]?.label || ""
+            },
+            label(context) {
+                const entry = entries[context.dataIndex]
+                const value = Number(context.parsed.x) || 0
+                const percent = entry?.total
+                    ? ((value / entry.total) * 100).toFixed(1)
+                    : "0.0"
+
+                return `${context.dataset.label}: ${value} (${percent}%)`
+            },
+            afterBody(context) {
+                const entry = entries[context[0].dataIndex]
+                return entry ? [`Total: ${entry.total}`] : []
+            }
+        }
+    }
+    options.onClick = (event, elements) => {
+        if (!elements.length) return
+
+        const element = elements[0]
+        const entry = entries[element.index]
+        if (!entry) return
+
+        const isPaid = element.datasetIndex === 0
+        const rows = rowsMatchingChartValue(
+            data,
+            columnName,
+            entry.label,
+            item => (parseCurrencyNumber(item?.[COLUMN_MAP.taxaAtivacao]) > 0) === isPaid
+        )
+        openChartRows(
+            `${columnName === COLUMN_MAP.plano ? "Plano" : "Vendedor"}: ${entry.label} - ${isPaid ? "Taxa paga" : "Taxa isenta"}`,
+            rows
+        )
+    }
+    options.onHover = (event, elements) => {
+        event.native.target.style.cursor =
+            elements.length ? "pointer" : "default"
+    }
+
+    return new Chart(
+        document.getElementById(canvasId),
+        {
+            type: "bar",
+            data: {
+                labels: entries.map(entry => wrapLabel(entry.label)),
+                datasets: [
+                    {
+                        label: "Taxa paga",
+                        data: entries.map(entry => entry.paid),
+                        backgroundColor: colors.paid,
+                        barPercentage: 0.64,
+                        categoryPercentage: 0.76
+                    },
+                    {
+                        label: "Taxa isenta",
+                        data: entries.map(entry => entry.exempt),
+                        backgroundColor: colors.exempt,
+                        barPercentage: 0.64,
+                        categoryPercentage: 0.76
+                    }
+                ]
+            },
+            options,
+            plugins: [emptyStatePlugin, stackedBarValueLabelsPlugin]
+        }
+    )
+}
+
 function getChartStatusLabel(statusType) {
     if (statusType === "won") return "Vencemos"
     if (statusType === "noViability") return "Sem viabilidade"
@@ -759,26 +893,85 @@ function getSalesChartState(prefix = "sales") {
         document.getElementById(`${prefix}ViewFilter`)
 
     const weekFilter =
-        document.getElementById(`${prefix}WeekFilter`)
+        document.getElementById(
+            prefix === "sales" ? "weekFilter" : `${prefix}WeekFilter`
+        )
 
     return {
         view: salesViewFilter?.value || "month",
-        week: weekFilter?.value || "all"
+        period: weekFilter?.value || ""
     }
 }
 
 function getWeekStart(date) {
-    const weekStart = new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate()
+    const startDay = Math.floor((date.getDate() - 1) / 7) * 7 + 1
+    return new Date(date.getFullYear(), date.getMonth(), startDay)
+}
+
+function getWeekEnd(date) {
+    const weekStart = getWeekStart(date)
+    const weekEnd = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth(),
+        weekStart.getDate() + 6
     )
-    const day = weekStart.getDay()
-    const diff = day === 0 ? -6 : 1 - day
+    const monthEnd = new Date(
+        weekStart.getFullYear(),
+        weekStart.getMonth() + 1,
+        0
+    )
 
-    weekStart.setDate(weekStart.getDate() + diff)
+    return weekEnd > monthEnd ? monthEnd : weekEnd
+}
 
-    return weekStart
+function getSelectedMonthPeriodKeys(state) {
+    const month = document.getElementById("monthFilter")?.value
+    const year = document.getElementById("yearFilter")?.value
+    const hasMonthAndYear =
+        month && year && month !== "all" && year !== "all"
+    const keys = []
+
+    if (state.view === "week") {
+        if (!state.period) return keys
+
+        const weekStart = parseDateKey(state.period)
+        if (
+            hasMonthAndYear &&
+            (weekStart.getFullYear() !== Number(year) ||
+                weekStart.getMonth() !== Number(month) - 1)
+        ) return keys
+
+        const weekEnd = getWeekEnd(weekStart)
+
+        for (let day = weekStart.getDate(); day <= weekEnd.getDate(); day++) {
+            keys.push(formatDateKey(new Date(
+                weekStart.getFullYear(),
+                weekStart.getMonth(),
+                day
+            )))
+        }
+        return keys
+    }
+
+    if (state.view !== "month" || !hasMonthAndYear) return keys
+
+    const today = new Date()
+    const monthNumber = Number(month)
+    const yearNumber = Number(year)
+    const isCurrentMonth =
+        monthNumber === today.getMonth() + 1 &&
+        yearNumber === today.getFullYear()
+    const lastDay = Math.min(
+        new Date(yearNumber, monthNumber, 0).getDate(),
+        isCurrentMonth ? today.getDate() : Infinity
+    )
+
+    for (let day = 1; day <= lastDay; day++) {
+        const date = new Date(yearNumber, monthNumber - 1, day)
+        keys.push(formatDateKey(date))
+    }
+
+    return keys
 }
 
 function formatDateKey(date) {
@@ -803,25 +996,49 @@ function parseDateKey(key) {
     return new Date(year, month - 1, day)
 }
 
+function isWithinSelectedMonthRange(date) {
+    const month = document.getElementById("monthFilter")?.value
+    const year = document.getElementById("yearFilter")?.value
+    if (!month || !year || month === "all" || year === "all") return true
+    if (
+        date.getMonth() + 1 !== Number(month) ||
+        date.getFullYear() !== Number(year)
+    ) return false
+
+    const today = new Date()
+    return date.getFullYear() !== today.getFullYear() ||
+        date.getMonth() !== today.getMonth() ||
+        date.getDate() <= today.getDate()
+}
+
 function getSalesDateKey(date, state = getSalesChartState()) {
+    if (!isWithinSelectedMonthRange(date)) return null
 
     if (state.view === "month") {
-        const month =
+        const selectedMonth = document.getElementById("monthFilter")?.value
+        const selectedYear = document.getElementById("yearFilter")?.value
+        if (
+            selectedMonth &&
+            selectedYear &&
+            selectedMonth !== "all" &&
+            selectedYear !== "all"
+        ) {
+            return formatDateKey(date)
+        }
+
+        const monthKey =
             String(date.getMonth() + 1)
                 .padStart(2, "0")
 
-        return `${date.getFullYear()}-${month}`
+        return `${date.getFullYear()}-${monthKey}`
     }
-
-    const weekStart =
-        formatDateKey(getWeekStart(date))
 
     if (state.view === "week") {
-        return weekStart
-    }
+        if (state.period !== formatDateKey(getWeekStart(date))) {
+            return null
+        }
 
-    if (state.week !== "all" && state.week !== weekStart) {
-        return null
+        return formatDateKey(date)
     }
 
     return formatDateKey(date)
@@ -848,16 +1065,57 @@ function formatSalesDateLabel(key, state = getSalesChartState()) {
     }
 
     const [year, month, day] = key.split("-")
-    if (state.view === "week") {
-        const weekStart = parseDateKey(key)
-        const weekEnd = parseDateKey(key)
+    return `${day}/${month}/${year}`
+}
 
-        weekEnd.setDate(weekEnd.getDate() + 6)
+function getChartDateTime(item, isWonRow = false) {
+    const dateColumns = isWonRow
+        ? [
+            COLUMN_MAP.dataAtivacao,
+            "Data ativação",
+            "Data de ativação",
+            "Data ativacao",
+            "Data de ativacao",
+            "Data Ativação",
+            "Data Ativacao"
+        ]
+        : [
+            COLUMN_MAP.data,
+            "Data do cadastro",
+            "Data cadastro"
+        ]
 
-        return `${String(weekStart.getDate()).padStart(2, "0")}/${String(weekStart.getMonth() + 1).padStart(2, "0")} a ${String(weekEnd.getDate()).padStart(2, "0")}/${String(weekEnd.getMonth() + 1).padStart(2, "0")}`
+    for (const column of dateColumns) {
+        const value = getField(item, column)
+        if (value == null || String(value).trim() === "") continue
+
+        const parsedDate = parseDate(value)
+        if (!parsedDate) continue
+
+        const date = new Date(parsedDate)
+        if (value instanceof Date) return date
+
+        const timeMatch = String(value).match(
+            /(?:T|\s)(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?/i
+        )
+        if (!timeMatch) return date
+
+        let hour = Number(timeMatch[1])
+        const minute = Number(timeMatch[2])
+        const second = Number(timeMatch[3] || 0)
+        const meridiem = timeMatch[4]?.toUpperCase()
+
+        if (meridiem) {
+            if (hour < 1 || hour > 12) return date
+            hour = hour % 12 + (meridiem === "PM" ? 12 : 0)
+        }
+        if (hour > 23 || minute > 59 || second > 59) return date
+
+        date.setHours(hour, minute, second, 0)
+        return date
     }
 
-    return `${day}/${month}/${year}`
+    return isWonRow ? getChartDateTime(item) : null
 }
 
 function createChannelsChart(data) {
@@ -1334,6 +1592,17 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
     const rowsByPeriod = {}
     const rowKeysByPeriod = {}
 
+    getSelectedMonthPeriodKeys(chartState).forEach(key => {
+        grouped[key] = {
+            prospects: 0,
+            inProgress: 0,
+            won: 0,
+            lost: 0
+        }
+        rowsByPeriod[key] = []
+        rowKeysByPeriod[key] = new Set()
+    })
+
     const addRowToPeriod = (key, item) => {
         if (!rowsByPeriod[key]) {
             rowsByPeriod[key] = []
@@ -1351,7 +1620,7 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
     const inProgressRows = new Set(metrics?.prospectStatusRows.inProgress || [])
 
     uniqueProspects.forEach(item => {
-        const parsedDate = extractRegistrationDate(item)
+        const parsedDate = getChartDateTime(item)
         if (!parsedDate) return
 
         const key = getSalesDateKey(parsedDate, chartState)
@@ -1362,8 +1631,7 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
                 prospects: 0,
                 inProgress: 0,
                 won: 0,
-                lost: 0,
-                noViability: 0
+                lost: 0
             }
             rowsByPeriod[key] = []
             rowKeysByPeriod[key] = new Set()
@@ -1375,15 +1643,12 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
     })
 
     uniqueData.forEach(item => {
-        const status = normalize(item?.[COLUMN_MAP.status])
         const isWonRow = isWon(item)
         const isLostRow = isLossStatus(item)
 
         if (!isWonRow && !isLostRow) return
 
-        const parsedDate = isWonRow
-            ? extractActivationDate(item) || extractRegistrationDate(item)
-            : extractRegistrationDate(item)
+        const parsedDate = getChartDateTime(item, isWonRow)
 
         const key = parsedDate
             ? getSalesDateKey(parsedDate, chartState)
@@ -1397,8 +1662,7 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
                 prospects: 0,
                 inProgress: 0,
                 won: 0,
-                lost: 0,
-                noViability: 0
+                lost: 0
             }
             rowsByPeriod[key] = []
             rowKeysByPeriod[key] = new Set()
@@ -1406,9 +1670,7 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
 
         if (isWonRow) {
             grouped[key].won++
-        } else if (isNoViabilityStatus(item)) {
-            grouped[key].noViability++
-        } else {
+        } else if (!isNoViabilityStatus(item)) {
             grouped[key].lost++
         }
 
@@ -1484,19 +1746,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
                         backgroundColor: CHART_COLORS.rose,
                         pointBackgroundColor: CHART_COLORS.rose,
                         pointBorderColor: CHART_COLORS.rose,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        borderWidth: 3
-                    },
-                    {
-                        label: "Sem viabilidade",
-                        data: sortedEntries.map(([_, values]) => values.noViability),
-                        tension: 0.35,
-                        fill: false,
-                        borderColor: CHART_COLORS.gray,
-                        backgroundColor: CHART_COLORS.gray,
-                        pointBackgroundColor: CHART_COLORS.gray,
-                        pointBorderColor: CHART_COLORS.gray,
                         pointRadius: 4,
                         pointHoverRadius: 6,
                         borderWidth: 3
@@ -1600,15 +1849,12 @@ function createSellersChart(data) {
         card.classList.remove("hidden")
     }
 
-    const wonOnly = data.filter(item => isWon(item))
+    const taxEligibleRows = data
+        .filter(item => isWon(item))
+        .filter(item => !isOwnershipTransferChannel(item))
+    const allEntries = getTaxStatusEntries(taxEligibleRows, COLUMN_MAP.vendedor)
 
-    const grouped = groupBy(
-        wonOnly,
-        COLUMN_MAP.vendedor
-    )
-    const allEntries = getTopEntries(grouped, Infinity)
-
-    if (!hasComparisonData(allEntries)) {
+    if (!allEntries.length) {
         toggleChartCard("sellersChartCard", false)
         return
     }
@@ -1623,15 +1869,15 @@ function createSellersChart(data) {
         () => createSellersChart(data)
     )
 
-    sellersChart = createHorizontalBarChart(
+    sellersChart = createTaxStatusBarChart(
         "sellersChart",
-        "Vendas",
         entries,
-        CHART_COLORS.blue,
-        label => openChartRows(
-            `Vendedor: ${label}`,
-            rowsMatchingChartValue(wonOnly, COLUMN_MAP.vendedor, label)
-        )
+        COLUMN_MAP.vendedor,
+        taxEligibleRows,
+        {
+            paid: "#4ADE80",
+            exempt: "#166534"
+        }
     )
     sellersChart.summaryEntries = allEntries
 }
@@ -1657,7 +1903,7 @@ function createInstallationChart(data) {
         }
     })
 
-    if ([paid, free].filter(value => value > 0).length < 2) {
+    if (!wonOnly.length) {
         toggleChartCard("installationChartCard", false)
         return
     }
@@ -1733,6 +1979,23 @@ function createInstallationChart(data) {
                             usePointStyle: true,
                             pointStyle: "circle",
                             padding: 18,
+                            generateLabels(chart) {
+                                const generatedLabels =
+                                    Chart.defaults.plugins.legend.labels.generateLabels(chart)
+                                const total = paid + free
+
+                                return generatedLabels.map((label, index) => {
+                                    const value = index === 0 ? paid : free
+                                    const percent = total
+                                        ? ((value / total) * 100).toFixed(1)
+                                        : "0.0"
+
+                                    return {
+                                        ...label,
+                                        text: `${label.text}: ${value} (${percent}%)`
+                                    }
+                                })
+                            },
                             font: {
                                 size: 12,
                                 weight: "600"
@@ -1772,7 +2035,9 @@ function createPlansChart(data) {
 
     const wonOnly = data.filter(item => isWon(item))
 
-    const wonWithPlan = wonOnly.filter(item => {
+    const wonWithPlan = wonOnly
+        .filter(item => !isOwnershipTransferChannel(item))
+        .filter(item => {
         const planId = item[COLUMN_MAP.plano]
 
         return String(planId || "").trim() !== ""
@@ -1790,19 +2055,7 @@ function createPlansChart(data) {
         card.classList.remove("hidden")
     }
 
-    const grouped = groupBy(
-        wonWithPlan,
-        COLUMN_MAP.plano
-    )
-    const allEntries = getTopEntries(grouped, Infinity)
-
-    if (!hasComparisonData(allEntries)) {
-        if (card) {
-            card.classList.add("hidden")
-        }
-
-        return
-    }
+    const allEntries = getTaxStatusEntries(wonWithPlan, COLUMN_MAP.plano)
 
     const entries = getChartEntriesWithExpansion(
         "plans",
@@ -1812,15 +2065,15 @@ function createPlansChart(data) {
         () => createPlansChart(data)
     )
 
-    plansChart = createHorizontalBarChart(
+    plansChart = createTaxStatusBarChart(
         "plansChart",
-        "Vendas",
         entries,
-        CHART_COLORS.emerald,
-        label => openChartRows(
-            `Plano: ${label}`,
-            rowsMatchingChartValue(wonWithPlan, COLUMN_MAP.plano, label)
-        )
+        COLUMN_MAP.plano,
+        wonWithPlan,
+        {
+            paid: "#4ADE80",
+            exempt: "#166534"
+        }
     )
     plansChart.summaryEntries = allEntries
 }

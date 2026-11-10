@@ -336,11 +336,10 @@ function getChartSummary(chartKey) {
     }
     if (chartKey === "salesPerDay") {
         const grouping = getSelectedFilterLabel("salesViewFilter")
-        const week = getSelectedFilterLabel("weekFilter")
+        const period = getSelectedFilterLabel("weekFilter")
         if (grouping) lines.push(`Agrupamento: ${grouping}`)
-        if (week && document.getElementById("weekFilter")?.value !== "all") {
-            lines.push(`Semana: ${week}`)
-        }
+        const view = document.getElementById("salesViewFilter")?.value
+        if (period && view === "week") lines.push(`Semana: ${period}`)
     }
 
     const labels = chart.data.labels.map(label =>
@@ -374,6 +373,29 @@ function getChartSummary(chartKey) {
     }
 
     if (summaryEntries?.length && !Array.isArray(summaryEntries[0])) {
+        if ("paid" in summaryEntries[0] && "exempt" in summaryEntries[0]) {
+            const paidTotal = summaryEntries.reduce(
+                (sum, entry) => sum + (Number(entry.paid) || 0),
+                0
+            )
+            const exemptTotal = summaryEntries.reduce(
+                (sum, entry) => sum + (Number(entry.exempt) || 0),
+                0
+            )
+            lines.push(`Total: ${formatChartSummaryValue(paidTotal + exemptTotal)}`)
+            lines.push(`- Taxa paga: ${formatChartSummaryValue(paidTotal)}`)
+            lines.push(`- Taxa isenta: ${formatChartSummaryValue(exemptTotal)}`)
+            lines.push("Detalhamento:")
+            summaryEntries.forEach(entry => {
+                lines.push(
+                    `${entry.label}: Taxa paga ${formatChartSummaryValue(entry.paid)} | ` +
+                    `Taxa isenta ${formatChartSummaryValue(entry.exempt)} | ` +
+                    `Total: ${formatChartSummaryValue(entry.total)}`
+                )
+            })
+            return lines.join("\n")
+        }
+
         const statusTypes = [
             ["won", "Vencemos"],
             ["lost", "Perdemos"],

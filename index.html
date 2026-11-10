@@ -948,7 +948,7 @@
                 <!-- PLANOS -->
                 <div id="plansChartCard" class="bg-[#4b3528] border border-[#6b4f3f] rounded-lg p-4 shadow-sm">
                     <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
-                        <h3 id="plansChartHeading" class="text-sm font-semibold text-[#f3e2cc]">Planos Mais Vendidos</h3>
+                        <h3 id="plansChartHeading" class="text-sm font-semibold text-[#f3e2cc]">Ranking de Planos</h3>
                         <div class="flex items-center gap-2">
                             <button type="button" class="chart-copy-button" data-chart-copy="plans" aria-label="Copiar resumo do gráfico Planos Mais Vendidos">Copiar resumo</button>
                             <span id="plansChartCopyStatus" class="text-xs text-[#d6ad87]" role="status" aria-live="polite"></span>
@@ -1046,9 +1046,8 @@
                         <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                             <select id="salesViewFilter"
                                 class="border border-[#6b4f3f] rounded-lg px-3 py-2 text-sm font-medium text-[#e5c9ac]">
-                                <option value="month">Por mês</option>
+                                <option value="month" selected>Por mês</option>
                                 <option value="week">Por semana</option>
-                                <option value="day" selected>Por dia</option>
                             </select>
 
                             <select id="weekFilter"

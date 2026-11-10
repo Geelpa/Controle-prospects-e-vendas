@@ -230,21 +230,19 @@ function updateSalesChartFilters(data, selectedMonth) {
 
     if (viewFilter.value === "month") {
         weekFilter.classList.add("hidden")
-        if (title) title.textContent = "Resultados por Mês"
+        if (title) title.textContent = "Resultados por Dia do Mês"
         return
     }
 
     if (viewFilter.value === "week") {
-        weekFilter.classList.add("hidden")
-        if (title) title.textContent = "Resultados por Semana"
+        populateWeekFilter(data)
+        weekFilter.classList.remove("hidden")
+        if (title) title.textContent = "Resultados por Dia da Semana"
         return
     }
 
-    populateWeekFilter(data)
-    weekFilter.classList.remove("hidden")
-    if (title) {
-        title.textContent = "Resultados por Dia"
-    }
+    weekFilter.classList.add("hidden")
+    if (title) title.textContent = "Resultados por Dia do Mês"
 }
 
 function populateWeekFilter(data) {
@@ -254,34 +252,46 @@ function populateWeekFilter(data) {
     const currentValue =
         weekFilter.value
 
-    weekFilter.innerHTML =
-        '<option value="all">Todas as semanas</option>'
+    weekFilter.innerHTML = ""
+    const month = document.getElementById("monthFilter")?.value
+    const year = document.getElementById("yearFilter")?.value
+    const today = new Date()
+    const selectedMonth = month && month !== "all" && year && year !== "all"
+    const periodValues = new Set()
 
-    const weekStarts = new Set()
+    if (selectedMonth) {
+        const monthNumber = Number(month)
+        const yearNumber = Number(year)
+        const lastDay = new Date(yearNumber, monthNumber, 0).getDate()
 
-    data.forEach(item => {
-        const parsedDate = isWon(item)
-            ? extractActivationDate(item)
-            : extractRegistrationDate(item)
+        for (let day = 1; day <= lastDay; day += 7) {
+            periodValues.add(formatDateKey(new Date(yearNumber, monthNumber - 1, day)))
+        }
+    } else {
+        data.forEach(item => {
+            const parsedDate = isWon(item)
+                ? extractActivationDate(item)
+                : extractRegistrationDate(item)
 
-        if (parsedDate) weekStarts.add(formatDateKey(getWeekStart(parsedDate)))
-    })
+            if (!parsedDate) return
 
-    const sortedWeekStarts = [...weekStarts]
+            periodValues.add(formatDateKey(getWeekStart(parsedDate)))
+        })
+    }
+
+    const sortedValues = [...periodValues]
         .sort((a, b) => parseDateKey(a) - parseDateKey(b))
 
-    sortedWeekStarts.forEach(weekStart => {
-        const startDate = parseDateKey(weekStart)
-        const endDate = parseDateKey(weekStart)
-
-        endDate.setDate(endDate.getDate() + 6)
+    sortedValues.forEach(value => {
+        const startDate = parseDateKey(value)
+        const endDate = getWeekEnd(startDate)
+        const label = `${formatShortDate(startDate)} a ${formatShortDate(endDate)}`
 
         const option =
             document.createElement("option")
 
-        option.value = weekStart
-        option.textContent =
-            `${formatShortDate(startDate)} a ${formatShortDate(endDate)}`
+        option.value = formatDateKey(getWeekStart(startDate))
+        option.textContent = label
 
         weekFilter.appendChild(option)
     })
@@ -289,7 +299,11 @@ function populateWeekFilter(data) {
     if ([...weekFilter.options].some(option => option.value === currentValue)) {
         weekFilter.value = currentValue
     } else {
-        weekFilter.value = "all"
+        const preferredDate = formatDateKey(today)
+        const preferredValue = formatDateKey(getWeekStart(today))
+        weekFilter.value = [...weekFilter.options].some(option => option.value === preferredValue)
+            ? preferredValue
+            : weekFilter.options[0]?.value || ""
     }
 }
 
