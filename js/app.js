@@ -108,10 +108,12 @@ function processData(prospectData, salesData) {
     // EM ANDAMENTO: todos os prospects com status diferentes de vencemos, perdemos, abortamos ou sem viabilidade
     const inProgress = currentDashboardMetrics.prospectStatusRows.inProgress.length;
 
-    const conversionOutcomeCount = won + lost;
+    const conversionWins = won
+    const conversionLosses = lost
+    const conversionOutcomeCount = conversionWins + conversionLosses
     const conversion =
         conversionOutcomeCount > 0
-            ? ((won / conversionOutcomeCount) * 100).toFixed(1)
+            ? (conversionWins / conversionOutcomeCount) * 100
             : 0;
 
     // --- BLOCO 2: FINANCEIRO (INTEGRALMENTE RESTAURADO) ---
@@ -161,6 +163,8 @@ function processData(prospectData, salesData) {
         activationsDailyAverage,
         won,
         lost,
+        conversionWins,
+        conversionLosses,
         aborted: currentDashboardMetrics.prospectStatusRows.aborted.length,
         noViability,
         generalLosses,
@@ -553,11 +557,8 @@ function updateMonthlyGoal() {
             entry.date <= observedThroughDate)
 
     const acquisitionRows = monthLeads.map(entry => entry.item)
-    const conversionWonRows = acquisitionRows.filter(isWon)
-    const conversionWonKeys = new Set(conversionWonRows.map(getWinDedupKey))
-    const conversionWins = conversionWonRows.length
+    const conversionWins = monthActivationRows.length
     const conversionLosses = acquisitionRows.filter(item =>
-        !conversionWonKeys.has(getWinDedupKey(item)) &&
         STATUS.lost.includes(normalize(item?.[COLUMN_MAP.status]))
     ).length
     const conversionOutcomeCount = conversionWins + conversionLosses
@@ -622,11 +623,13 @@ function updateMonthlyGoal() {
     setText("activationEstimatedTarget", estimatedActivations === null
         ? "--"
         : Math.round(estimatedActivations).toLocaleString("pt-BR"))
-    setText("activationConversionSummary", conversionRate > 0
-        ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`
+    setText("activationConversionSummary", conversionOutcomeCount > 0
+        ? `${(conversionRate * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
         : "--")
     setText("activationGoalFormula", leadTarget === null
-        ? "Sem Vencemos ou Perdemos neste mês para calcular a taxa de conversão e a meta de leads."
+        ? conversionOutcomeCount === 0
+            ? `Sem Vencemos ou Perdemos em ${formatMonth(targetDate)} para calcular a taxa de conversão e a meta de leads.`
+            : `A conversão do mês de ${formatMonth(targetDate)} foi 0%; sem ativações, não é possível estimar as ativações pela projeção de leads.`
         : projectedLeadCount === null
             ? `Projeção indisponível para o mês futuro. Conversão do mês: ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%.`
             : `${formatDailyAverage(projectedLeadCount / targetMonthDays)} leads/dia projetam ${formatCount(projectedLeadCount)} leads no mês; × ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${Math.round(estimatedActivations).toLocaleString("pt-BR")} ativações estimadas.`)
@@ -645,19 +648,27 @@ function updateMonthlyGoal() {
         ? "--"
         : formatCount(projectedLeadCount))
     setText("leadGoalFormula", leadTarget === null
-        ? `Sem Vencemos ou Perdemos no mês de ${targetLabel}; não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
+        ? conversionOutcomeCount === 0
+            ? `Sem Vencemos ou Perdemos no mês de ${targetLabel}; não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
+            : `A conversão do mês de ${targetLabel} foi 0%; sem ativações, não é possível calcular a quantidade de leads necessária para a meta de ${formatCount(monthlyActivationGoal)} ativações.`
         : `${formatCount(monthlyActivationGoal)} ativações ÷ ${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}% de conversão = ${formatCount(leadTarget)} leads no mês, ou ${formatDailyAverage(leadDailyTarget)} leads por dia corrido.`)
-    setText("goalConversion", conversionRate > 0
+    setText("goalConversion", conversionOutcomeCount > 0
         ? `${(conversionRate * 100).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
         : "--")
+    updateConversionQuality(
+        conversionOutcomeCount > 0 ? conversionRate * 100 : null,
+        "goalConversionQuality"
+    )
     setText("goalConversionDetail", conversionOutcomeCount > 0
-        ? `${conversionWins} Vencemos ÷ (${conversionWins} Vencemos + ${conversionLosses} Perdemos) em ${formatMonth(targetDate)}`
+        ? `${conversionWins} ativações por data de ativação + ${conversionLosses} perdas por data de cadastro em ${formatMonth(targetDate)}`
         : `Sem Vencemos ou Perdemos em ${formatMonth(targetDate)}`)
     setText("goalHistoryPeriod", isTargetMonthFuture
         ? `Mês selecionado: ${targetLabel} · O período ainda não começou.`
-        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão: Vencemos ÷ (Vencemos + Perdemos).`)
+        : `Mês analisado: ${targetLabel} · ${formatCount(monthLeads.length)} leads cadastrados · ${formatCount(monthActivationRows.length)} ativações realizadas · Conversão: ativações pela data de ativação + perdas pela data de cadastro.`)
     setText("goalStatus", leadTarget === null
-        ? `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A meta de leads depende de haver Vencemos ou Perdemos no mês selecionado.`
+        ? conversionOutcomeCount === 0
+            ? `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A meta de leads depende de haver Vencemos ou Perdemos no mês selecionado.`
+            : `Meta mensal: ${formatCount(monthlyActivationGoal)} ativações. A conversão do mês foi 0%, então não há taxa para estimar a meta de leads.`
         : `Projeção e conversão calculadas com os dados de ${targetLabel}; o realizado e os leads restantes refletem o andamento do próprio mês.`)
 
     latestGoalSummary = {
@@ -666,7 +677,7 @@ function updateMonthlyGoal() {
             `Realizado: ${formatCount(monthLeads.length)} de ${leadTarget === null ? "meta não calculada" : `${formatCount(leadTarget)} necessários`} (${formatPercent(monthLeads.length, leadTarget)}).`,
             `Meta diária: ${leadDailyTarget === null ? "indisponível" : `${formatDailyAverage(leadDailyTarget)} leads/dia corrido`}.`,
             `Projeção até o fim do mês: ${projectedLeadCount === null ? "indisponível" : formatCount(projectedLeadCount)} leads.`,
-            `Conversão da safra: ${conversionRate > 0 ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "indisponível"}.`
+            `Conversão do mês: ${conversionOutcomeCount > 0 ? `${(conversionRate * 100).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%` : "indisponível"}.`
         ].join("\n"),
         activations: [
             `Meta de ${targetLabel} — Ativações`,
