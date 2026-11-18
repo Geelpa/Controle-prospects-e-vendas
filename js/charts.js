@@ -569,7 +569,7 @@ function getChartDisplayValue(item, columnName) {
 
     if (columnName === COLUMN_MAP.vendedor) {
         const sellerValue = getSellerValue(item)
-        return resolveSellerDisplayName(sellerValue) || sellerValue || `Vendedor ${key}`
+        return resolveSellerDisplayName(sellerValue) || sellerValue || "Sem vendedor"
     }
 
     return key || "Sem registro"
@@ -1124,8 +1124,7 @@ function createChannelsChart(data) {
 
     const uniqueData = getDeduplicatedChartRows(data)
 
-    // Exclui movimentos de "Troca de Titularidade" dos canais
-    const filteredData = uniqueData.filter(item => !isOwnershipTransferChannel(item))
+    const filteredData = getAcquisitionRankingRows(uniqueData)
 
     const allEntries =
         getSplitStatusEntries(filteredData, COLUMN_MAP.canal)
@@ -1160,7 +1159,7 @@ function createCampaignsChart(data) {
 
     destroyChart(campaignsChart)
 
-    const uniqueData = getDeduplicatedChartRows(data)
+    const uniqueData = getCampaignRankingRows(getDeduplicatedChartRows(data))
     const allEntries =
         getSplitStatusEntries(uniqueData, COLUMN_MAP.campanha)
 
@@ -1595,7 +1594,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
     getSelectedMonthPeriodKeys(chartState).forEach(key => {
         grouped[key] = {
             prospects: 0,
-            inProgress: 0,
             won: 0,
             lost: 0
         }
@@ -1617,7 +1615,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
     }
 
     const uniqueProspects = metrics?.prospects || getDeduplicatedChartRows(prospectRows)
-    const inProgressRows = new Set(metrics?.prospectStatusRows.inProgress || [])
 
     uniqueProspects.forEach(item => {
         const parsedDate = getChartDateTime(item)
@@ -1629,7 +1626,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
         if (!grouped[key]) {
             grouped[key] = {
                 prospects: 0,
-                inProgress: 0,
                 won: 0,
                 lost: 0
             }
@@ -1638,7 +1634,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
         }
 
         grouped[key].prospects++
-        if (inProgressRows.has(item)) grouped[key].inProgress++
         addRowToPeriod(key, item)
     })
 
@@ -1660,7 +1655,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
         if (!grouped[key]) {
             grouped[key] = {
                 prospects: 0,
-                inProgress: 0,
                 won: 0,
                 lost: 0
             }
@@ -1698,19 +1692,6 @@ function createSalesPerDayChart(data, prospectRows = [], metrics = currentDashbo
             data: {
                 labels,
                 datasets: [
-                    {
-                        label: "Em andamento",
-                        data: sortedEntries.map(([_, values]) => values.inProgress),
-                        tension: 0.35,
-                        fill: false,
-                        borderColor: CHART_COLORS.amber,
-                        backgroundColor: CHART_COLORS.amber,
-                        pointBackgroundColor: CHART_COLORS.amber,
-                        pointBorderColor: CHART_COLORS.amber,
-                        pointRadius: 4,
-                        pointHoverRadius: 6,
-                        borderWidth: 3
-                    },
                     {
                         label: "Prospectados",
                         data: sortedEntries.map(([_, values]) => values.prospects),
@@ -1849,9 +1830,7 @@ function createSellersChart(data) {
         card.classList.remove("hidden")
     }
 
-    const taxEligibleRows = data
-        .filter(item => isWon(item))
-        .filter(item => !isOwnershipTransferChannel(item))
+    const taxEligibleRows = data.filter(item => isWon(item))
     const allEntries = getTaxStatusEntries(taxEligibleRows, COLUMN_MAP.vendedor)
 
     if (!allEntries.length) {
@@ -1886,10 +1865,8 @@ function createInstallationChart(data) {
 
     destroyChart(installationChart)
 
-    // Exclui "Troca de Titularidade" das taxas
-    const wonOnly = data
-        .filter(item => isWon(item))
-        .filter(item => !isOwnershipTransferChannel(item))
+    const wonOnly = data.filter(item => isWon(item))
+    const installationLabels = ["Taxa paga", "Taxa isenta"]
 
     let paid = 0
     let free = 0
@@ -1916,10 +1893,7 @@ function createInstallationChart(data) {
             type: "doughnut",
 
             data: {
-                labels: [
-                    "Taxa paga",
-                    "Taxa isenta",
-                ],
+                labels: installationLabels,
 
                 datasets: [{
                     data: [paid, free],
@@ -1959,10 +1933,6 @@ function createInstallationChart(data) {
                             rows
                         )
                     }
-                    openChartRows(
-                        index === 0 ? "Taxa paga" : "Taxa isenta",
-                        rows
-                    )
                 },
 
                 onHover(event, elements) {
@@ -1992,7 +1962,7 @@ function createInstallationChart(data) {
 
                                     return {
                                         ...label,
-                                        text: `${label.text}: ${value} (${percent}%)`
+                                        text: `${chart.data.labels[index] || installationLabels[index]}: ${value} (${percent}%)`
                                     }
                                 })
                             },
@@ -2011,11 +1981,14 @@ function createInstallationChart(data) {
                                     0
                                 )
                                 const value = context.parsed
+                                const label = context.label ||
+                                    context.chart.data.labels[context.dataIndex] ||
+                                    installationLabels[context.dataIndex]
                                 const percent = total
                                     ? ((value / total) * 100).toFixed(1)
                                     : "0.0"
 
-                                return `${context.label}: ${value} (${percent}%)`
+                                return `${label}: ${value} (${percent}%)`
                             }
                         }
                     }
@@ -2033,10 +2006,11 @@ function createPlansChart(data) {
     const card =
         document.getElementById("plansChartCard")
 
-    const wonOnly = data.filter(item => isWon(item))
+    const wonOnly = data
+        .filter(item => isWon(item))
+        .filter(item => !isExcludedRankingPlan(getChartDisplayValue(item, COLUMN_MAP.plano)))
 
     const wonWithPlan = wonOnly
-        .filter(item => !isOwnershipTransferChannel(item))
         .filter(item => {
         const planId = item[COLUMN_MAP.plano]
 

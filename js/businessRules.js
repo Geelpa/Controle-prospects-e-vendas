@@ -27,6 +27,40 @@ const isAdditionalPlan = (item, map = COLUMN_MAP) => {
 const isNewProspect = (item, map = COLUMN_MAP) =>
     !isAdditionalPlan(item, map);
 
+function getAcquisitionRankingRows(rows) {
+    return (rows || []).filter(item =>
+        !isAdditionalPlan(item, COLUMN_MAP)
+    );
+}
+
+function isExcludedRankingCampaign(label) {
+    const normalizedLabel = String(label || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    return normalizedLabel === "taxa nao ofertada";
+}
+
+function getCampaignRankingRows(rows) {
+    return getAcquisitionRankingRows(rows).filter(item =>
+        !isExcludedRankingCampaign(item?.[COLUMN_MAP.campanha])
+    );
+}
+
+function isExcludedRankingPlan(label) {
+    const normalizedLabel = String(label || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim();
+
+    return /\b(exclusiv[oa]s?|test(e|es|ando|ado)?|sem\s+plano|nenhum\s+plano|plano\s+nao\s+definido)\b/.test(normalizedLabel);
+}
+
 function getProspectStatusCategory(item) {
     const status = normalize(item?.[COLUMN_MAP.status])
     if (STATUS.won.includes(status)) return "won"

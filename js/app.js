@@ -201,8 +201,7 @@ function processData(prospectData, salesData) {
 
     updateTopRanking(currentDashboardMetrics, chartDataWithCorrectSellers);
 
-    // Gráficos de desempenho devem seguir a base real de vendas e manter status perdidos/andamento
-    // para comparação; só o canal de venda exclui Troca de Titularidade.
+    // Gráficos de vendedores, planos e instalações contam as mesmas vendas do ranking.
     if (typeof createSellersChart === "function") createSellersChart(chartDataWithCorrectSellers);
     if (typeof createPlansChart === "function") createPlansChart(chartDataWithCorrectSellers);
     if (typeof createInstallationChart === "function") createInstallationChart(chartDataWithCorrectSellers);
@@ -216,14 +215,14 @@ function processData(prospectData, salesData) {
         createSalesPerDayChart(resultChartRows, prospectsData, currentDashboardMetrics);
     }
 
-    // Gráficos de comparação de status também precisam dos prospects sem contrato,
-    // pois perdas e registros sem viabilidade não entram na base de vendas/ativação.
+    // Canal e campanha usam a mesma base de aquisição do ranking; perdas preservam a base anterior.
+    const acquisitionChartRows = currentDashboardMetrics.rankingRows;
     const statusChartRows = [
         ...(salesData || []),
         ...prospectsData
     ];
-    if (typeof createChannelsChart === "function") createChannelsChart(statusChartRows);
-    if (typeof createCampaignsChart === "function") createCampaignsChart(statusChartRows);
+    if (typeof createChannelsChart === "function") createChannelsChart(acquisitionChartRows);
+    if (typeof createCampaignsChart === "function") createCampaignsChart(acquisitionChartRows);
     if (typeof createLossReasonsChart === "function") createLossReasonsChart(statusChartRows);
 }
 
@@ -760,17 +759,6 @@ function isRankingContractPenalty(item) {
         STATUS.contractWithdrawn.includes(contractStatus);
 }
 
-function isExcludedRankingPlan(label) {
-    const normalizedLabel = String(label || "")
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim();
-
-    return /\b(exclusiv[oa]s?|test(e|es|ando|ado)?|sem\s+plano|nenhum\s+plano|plano\s+nao\s+definido)\b/.test(normalizedLabel);
-}
-
 function getRankingGroupMetrics(rows, columnName, referenceDate = new Date(), includeActivationTax = false) {
     const grouped = new Map();
 
@@ -944,9 +932,7 @@ function updateTopRanking(metrics, sellerRows) {
     const normalizedSalesRows = metrics.salesRows;
     const allRankingRows = metrics.rankingRows;
     const rankingReferenceDate = new Date();
-    const acquisitionRows = allRankingRows.filter(item =>
-        !isAdditionalPlan(item, COLUMN_MAP) && !isOwnershipTransferChannel(item)
-    );
+    const acquisitionRows = getAcquisitionRankingRows(allRankingRows);
     const totalMonths = new Set(allRankingRows.map(getRankingMonthKey).filter(Boolean)).size;
     const acquisitionMonths = new Set(acquisitionRows.map(getRankingMonthKey).filter(Boolean)).size;
     const totalWon = allRankingRows.filter(isWon).length;
@@ -972,7 +958,13 @@ function updateTopRanking(metrics, sellerRows) {
     };
     const topSeller = getBestRankingEntry(sellerEntries, sellerOptions);
 
-    const campaignEntries = getRankingGroupMetrics(acquisitionRows, COLUMN_MAP.campanha);
+    const campaignRankingRows = getCampaignRankingRows(allRankingRows);
+    const campaignWon = campaignRankingRows.filter(isWon).length;
+    const campaignLost = campaignRankingRows.filter(isLossStatus).length;
+    const campaignConversion = campaignWon + campaignLost > 0
+        ? campaignWon / (campaignWon + campaignLost)
+        : 0;
+    const campaignEntries = getRankingGroupMetrics(campaignRankingRows, COLUMN_MAP.campanha);
     const channelEntries = getRankingGroupMetrics(acquisitionRows, COLUMN_MAP.canal);
     const conversionOptions = entries => ({
         type: "conversion",
@@ -983,7 +975,13 @@ function updateTopRanking(metrics, sellerRows) {
         maxWon: Math.max(...entries.map(entry => entry.won), 0),
         maxAverageTicket: Math.max(...entries.map(entry => entry.won ? entry.revenue / entry.won : 0), 0)
     });
-    const topCampaign = getBestRankingEntry(campaignEntries, conversionOptions(campaignEntries));
+    const campaignOptions = {
+        ...conversionOptions(campaignEntries),
+        globalConversion: campaignConversion,
+        totalMonths: new Set(campaignRankingRows.map(getRankingMonthKey).filter(Boolean)).size,
+        totalRows: campaignRankingRows.length
+    };
+    const topCampaign = getBestRankingEntry(campaignEntries, campaignOptions);
     const topChannel = getBestRankingEntry(channelEntries, conversionOptions(channelEntries));
     const planEntries = getRankingGroupMetrics(allRankingRows, COLUMN_MAP.plano, rankingReferenceDate, true);
     const planOptions = {
@@ -1000,7 +998,7 @@ function updateTopRanking(metrics, sellerRows) {
 
     activeRankingViews = {
         seller: enrichRankingEntries(sellerEntries, sellerOptions),
-        campaign: enrichRankingEntries(campaignEntries, conversionOptions(campaignEntries)),
+        campaign: enrichRankingEntries(campaignEntries, campaignOptions),
         channel: enrichRankingEntries(channelEntries, conversionOptions(channelEntries))
         ,plan: enrichRankingEntries(planEntries, planOptions)
     };
