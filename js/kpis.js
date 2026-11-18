@@ -130,6 +130,8 @@ function updateKPIs({
     prospectsDailyAverage,
     activationsDailyAverage,
     won,
+    wonPme,
+    wonPf,
     lost,
     conversionWins,
     conversionLosses,
@@ -157,6 +159,8 @@ function updateKPIs({
         won
     document.getElementById("activationsDailyAverage").innerText =
         formatDailyKpi(activationsDailyAverage)
+    document.getElementById("wonPlanBreakdown").innerText =
+        `PME: ${wonPme} • PF: ${wonPf}`
 
     document.getElementById("lostDeals").innerText =
         lost

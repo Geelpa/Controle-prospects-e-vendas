@@ -78,6 +78,8 @@ function processData(prospectData, salesData) {
     // Vencemos inclui contratos ativos e prospects com status Vencemos, deduplicados.
     const wonRows = currentDashboardMetrics.wonRows;
     const won = currentDashboardMetrics.wonKpiRows.length;
+    const wonPme = currentDashboardMetrics.wonKpiRows.filter(isBusinessPlan).length;
+    const wonPf = won - wonPme;
     const prospectsDailyAverage = getFilteredDailyAverage(
         prospectsData,
         extractRegistrationDate
@@ -162,6 +164,8 @@ function processData(prospectData, salesData) {
         prospectsDailyAverage,
         activationsDailyAverage,
         won,
+        wonPme,
+        wonPf,
         lost,
         conversionWins,
         conversionLosses,

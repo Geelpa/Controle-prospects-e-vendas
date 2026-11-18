@@ -27,6 +27,19 @@ const isAdditionalPlan = (item, map = COLUMN_MAP) => {
 const isNewProspect = (item, map = COLUMN_MAP) =>
     !isAdditionalPlan(item, map);
 
+function isBusinessPlan(item) {
+    const plan = String(item?.[COLUMN_MAP.plano] || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, " ")
+        .trim();
+
+    return plan.includes("PME") ||
+        plan.includes("IP FIXO") ||
+        plan.includes("TELEFONIA");
+}
+
 function getAcquisitionRankingRows(rows) {
     return (rows || []).filter(item =>
         !isAdditionalPlan(item, COLUMN_MAP)
